@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan2Gether — find where to hang out</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- Firebase (free, no backend code to write — see README / setup instructions) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --dusk:#1B1F3B;
+    --dusk-2:#262C52;
+    --dusk-3:#323B6E;
+    --amber:#F2A65A;
+    --coral:#E8615C;
+    --paper:#F6F1E7;
+    --ink:#1B1F3B;
+    --mist:#9098C0;
+    --good:#7FBE8F;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 12% 8%, rgba(242,166,90,0.10), transparent 40%),
+      radial-gradient(circle at 88% 92%, rgba(232,97,92,0.10), transparent 45%),
+      var(--dusk);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:32px 16px 60px;
+  }
+  .app{
+    width:100%;
+    max-width:560px;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:28px;
+  }
+  .brand .dot{
+    width:10px;height:10px;border-radius:50%;
+    background:var(--amber);
+    box-shadow:0 0 0 4px rgba(242,166,90,0.18);
+  }
+  .brand h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:1.5rem;
+    margin:0;
+    letter-spacing:0.2px;
+  }
+  .brand span{color:var(--mist);font-size:0.85rem;}
+
+  .route{
+    position:relative;
+    padding-left:26px;
+  }
+  .route::before{
+    content:"";
+    position:absolute;
+    left:5px; top:6px; bottom:6px;
+    width:2px;
+    background-image:linear-gradient(var(--mist) 60%, transparent 0%);
+    background-size:2px 10px;
+    background-repeat:repeat-y;
+    opacity:0.35;
+  }
+  .pin{
+    position:absolute;
+    left:-2px;
+    width:14px;height:14px;
+    border-radius:50% 50% 50% 0;
+    background:var(--amber);
+    transform:rotate(-45deg);
+    top:8px;
+    box-shadow:0 0 0 3px rgba(27,31,59,1), 0 0 0 4px rgba(242,166,90,0.35);
+  }
+
+  .card{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:var(--radius);
+    padding:26px 24px;
+    margin-bottom:18px;
+    box-shadow:0 14px 32px rgba(0,0,0,0.28);
+  }
+  .card h2{
+    font-family:'Fraunces',serif;
+    font-size:1.3rem;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .card p.sub{
+    margin:0 0 18px;
+    color:#5b5f7a;
+    font-size:0.92rem;
+  }
+  .choices{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+  }
+  .choice-btn{
+    border:2px solid #e3ddcd;
+    background:#fff;
+    border-radius:14px;
+    padding:18px 14px;
+    text-align:left;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:border-color .15s, transform .1s;
+  }
+  .choice-btn:hover{border-color:var(--amber); transform:translateY(-1px);}
+  .choice-btn strong{display:block; font-family:'Fraunces',serif; font-size:1.05rem; margin-bottom:3px;}
+  .choice-btn span{color:#6b6f8a; font-size:0.83rem;}
+
+  label{
+    display:block;
+    font-size:0.78rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:#7a7e98;
+    font-weight:600;
+    margin:14px 0 6px;
+  }
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=number], select{
+    width:100%;
+    padding:12px 13px;
+    border-radius:10px;
+    border:1.5px solid #e3ddcd;
+    background:#fff;
+    font-size:0.98rem;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+  }
+  input:focus, select:focus, .choice-btn:focus-visible, .tag:focus-visible, button:focus-visible{
+    outline:3px solid #cdb9ff44;
+    outline-offset:1px;
+    border-color:var(--amber);
+  }
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+
+  .tags{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;}
+  .tag{
+    border:1.5px solid #e3ddcd;
+    background:#fff;
+    padding:9px 14px;
+    border-radius:999px;
+    font-size:0.86rem;
+    cursor:pointer;
+    color:#41435c;
+    font-weight:500;
+  }
+  .tag.active{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--paper);
+  }
+
+  .btn{
+    width:100%;
+    border:none;
+    border-radius:12px;
+    padding:14px 16px;
+    font-size:0.98rem;
+    font-weight:700;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    margin-top:18px;
+    transition:filter .15s, transform .1s;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--amber); color:#26203d;}
+  .btn-primary:hover{filter:brightness(1.06);}
+  .btn-ghost{background:transparent; color:#6b6f8a; border:1.5px solid #e3ddcd;}
+  .btn-secondary{background:var(--dusk); color:var(--paper);}
+  .btn:disabled{opacity:0.45; cursor:not-allowed;}
+
+  .ticket{
+    border:2px dashed var(--dusk-3);
+    border-radius:14px;
+    padding:18px;
+    text-align:center;
+    background:var(--dusk-2);
+    margin-bottom:8px;
+  }
+  .ticket .code{
+    font-family:'JetBrains Mono', monospace;
+    font-size:2.1rem;
+    font-weight:700;
+    letter-spacing:0.12em;
+    color:var(--amber);
+  }
+  .ticket .label{font-size:0.78rem; color:var(--mist); text-transform:uppercase; letter-spacing:0.08em;}
+
+  .member-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:11px 4px;
+    border-bottom:1px solid #ece6d6;
+  }
+  .member-row:last-child{border-bottom:none;}
+  .member-row .who{font-weight:600;}
+  .member-row .meta{font-size:0.8rem; color:#7a7e98;}
+  .badge{
+    font-size:0.72rem;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:999px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .badge.ready{background:#e4f3e6; color:#3c8451;}
+  .badge.waiting{background:#fbeee0; color:#a86a2d;}
+
+  .small-link{
+    background:none;border:none;color:var(--mist);
+    text-decoration:underline; cursor:pointer; font-size:0.85rem;
+    padding:0; margin-top:14px;
+  }
+
+  .weather-strip{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--dusk-2);
+    border-radius:14px;
+    padding:14px 16px;
+    margin-bottom:16px;
+  }
+  .weather-strip .emoji{font-size:1.8rem;}
+  .weather-strip .wtext strong{display:block; font-family:'Fraunces',serif; font-size:1.05rem;}
+  .weather-strip .wtext span{color:var(--mist); font-size:0.82rem;}
+
+  .spot{
+    border:1.5px solid #e3ddcd;
+    border-radius:14px;
+    padding:16px 16px;
+    margin-bottom:12px;
+    background:#fff;
+  }
+  .spot-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .spot h3{font-family:'Fraunces',serif; margin:0 0 4px; font-size:1.08rem;}
+  .spot .cat{
+    font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em;
+    color:#a86a2d; font-weight:700;
+  }
+  .spot p{margin:8px 0 0; font-size:0.88rem; color:#52546b; line-height:1.45;}
+  .spot .fit{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.78rem;
+    color:#3c8451;
+    background:#e4f3e6;
+    padding:3px 9px;
+    border-radius:7px;
+    white-space:nowrap;
+  }
+  .spot .tagsrow{margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;}
+  .spot .mini{
+    font-size:0.72rem;
+    background:#f3eee0;
+    color:#6b6f8a;
+    padding:3px 8px;
+    border-radius:999px;
+  }
+
+  .error-msg{
+    color:#b3413c;
+    background:#fbe7e5;
+    border-radius:10px;
+    padding:10px 13px;
+    font-size:0.85rem;
+    margin-top:10px;
+  }
+  .hint{color:var(--mist); font-size:0.85rem; text-align:center; margin-top:10px;}
+  .hidden{display:none !important;}
+
+  @media (max-width:420px){
+    .choices{grid-template-columns:1fr;}
+    .row2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand"><div class="dot"></div><h1>Plan2Gether</h1><span>— pick a spot, together</span></div>
+  <div class="route" id="route"></div>
+</div>
+
+<script>
+/* =====================================================================
+   FIREBASE SETUP — paste your config below.
+   See the setup instructions for how to get these 4 values
+   (it's a 2-minute free signup, no credit card, no backend code).
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBQGD2VvJPvYyOS3mgxJIp-uHOamvENoPQ",
+  databaseURL: "https://plan2gether-ccf06-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "plan2gether-ccf06",
+};
+
+let db = null;
+let firebaseReady = false;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  firebaseReady = true;
+} catch (e) {
+  console.error('Firebase init failed:', e);
+}
+
+/* ---------------- STATE & STORAGE HELPERS ---------------- */
+const screens = {};
+const routeEl = document.getElementById('route');
+
+function render(html){
+  if(!firebaseReady){
+    routeEl.innerHTML = `
+      <div class="pin"></div>
+      <div class="card">
+        <h2>Setup needed</h2>
+        <p class="sub">This app can't connect to its database yet. Open this file, find the <code>firebaseConfig</code> object near the top of the &lt;script&gt; tag, and paste in your real Firebase project values (apiKey, databaseURL, projectId). See the setup steps that came with this file.</p>
+      </div>`;
+    return;
+  }
+  routeEl.innerHTML = `<div class="pin"></div>${html}`;
+}
+
+function getDeviceId(){
+  let id = localStorage.getItem('p2g_device_id');
+  if(!id){ id = 'm'+Math.random().toString(36).slice(2,10); localStorage.setItem('p2g_device_id', id); }
+  return id;
+}
+const deviceId = getDeviceId();
+
+function genCode(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c='';
+  for(let i=0;i<5;i++) c+=chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+
+/* Shared party data now lives in Firebase Realtime Database instead of
+   the Claude-artifact-only window.storage API, so any device with this
+   page open (and the same firebaseConfig) can read/write the same party. */
+async function getParty(code){
+  try{
+    const snap = await db.ref('parties/' + code).get();
+    return snap.exists() ? snap.val() : null;
+  }catch(e){
+    console.error('getParty failed:', e);
+    return null;
+  }
+}
+async function setParty(code, data){
+  try{
+    await db.ref('parties/' + code).set(data);
+  }catch(e){
+    console.error('setParty failed:', e);
+  }
+}
+
+let currentCode = localStorage.getItem('p2g_party_code') || null;
+let pollTimer = null;
+function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+
+/* ---------------- SCREEN: HOME ---------------- */
+function screenHome(){
+  stopPoll();
+  render(`
+    <div class="card">
+      <h2>Where are you two (or more) hanging out?</h2>
+      <p class="sub">Start a party, or join one with a code from a friend.</p>
+      <div class="choices">
+        <button class="choice-btn" id="goCreate">
+          <strong>Create a party</strong>
+          <span>You'll get a code to share</span>
+        </button>
+        <button class="choice-btn" id="goJoin">
+          <strong>Join a party</strong>
+          <span>Got a code already</span>
+        </button>
+      </div>
+    </div>
+  `);
+  document.getElementById('goCreate').onclick = screenCreate;
+  document.getElementById('goJoin').onclick = screenJoinCode;
+}
+
+/* ---------------- SCREEN: CREATE (leader makes code) ---------------- */
+function screenCreate(){
+  render(`
+    <div class="card">
+      <h2>Start a party</h2>
+      <p class="sub">You'll be the party leader — you choose the area and start the search once everyone's in.</p>
+      <button class="btn btn-primary" id="makeCode">Generate party code</button>
+      <button class="small-link" id="back1">← back</button>
+    </div>
+  `);
+  document.getElementById('back1').onclick = screenHome;
+  document.getElementById('makeCode').onclick = async ()=>{
+    const code = genCode();
+    const party = { code, leaderId: deviceId, location:null, status:'collecting', members:{}, createdAt: Date.now() };
+    await setParty(code, party);
+    currentCode = code;
+    localStorage.setItem('p2g_party_code', code);
+    localStorage.setItem('p2g_is_leader', '1');
+    screenProfile(true);
+  };
+}
+
+/* ---------------- SCREEN: JOIN (enter code) ---------------- */
+function screenJoinCode(){
+  render(`
+    <div class="card">
+      <h2>Join a party</h2>
+      <p class="sub">Enter the 5-character code your friend sent you.</p>
+      <label>Party code</label>
+      <input type="text" id="codeInput" maxlength="5" placeholder="e.g. K7QXT" style="text-transform:uppercase; letter-spacing:0.15em; font-family:'JetBrains Mono',monospace; font-weight:700;">
+      <div id="joinErr"></div>
+      <button class="btn btn-primary" id="checkCode">Continue</button>
+      <button class="small-link" id="back2">← back</button>
+    </div>
+  `);
+  document.getElementById('back2').onclick = screenHome;
+  const input = document.getElementById('codeInput');
+  input.addEventListener('input', ()=>{ input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
+  document.getElementById('checkCode').onclick = async ()=>{
+    const code = input.value.trim();
+    const errBox = document.getElementById('joinErr');
+    errBox.innerHTML='';
+    if(code.length<4){ errBox.innerHTML = `<div class="error-msg">Enter the full code.</div>`; return; }
+    const party = await getParty(code);
+    if(!party){ errBox.innerHTML = `<div class="error-msg">No party found with that code. Double-check with your friend.</div>`; return; }
+    if(party.status === 'done'){ errBox.innerHTML = `<div class="error-msg">This party already finished its search.</div>`; return; }
+    currentCode = code;
+    localStorage.setItem('p2g_party_code', code);
+    localStorage.setItem('p2g_is_leader','0');
+    screenProfile(false);
+  };
+}
+
+/* ---------------- SCREEN: PROFILE FORM ---------------- */
+const PREF_OPTIONS = [
+  {k:'chill', label:'Chill / hangout'},
+  {k:'romantic', label:'Romantic'},
+  {k:'games', label:'Games / activities'},
+  {k:'restaurant', label:'Restaurant'},
+  {k:'coffee', label:'Coffee / casual bite'},
+  {k:'nightlife', label:'Nightlife'},
+  {k:'outdoors', label:'Outdoors / nature'},
+  {k:'culture', label:'Culture / museums'},
+];
+
+function screenProfile(isLeader){
+  const selected = new Set();
+  render(`
+    <div class="ticket">
+      <div class="label">Party code</div>
+      <div class="code">${currentCode}</div>
+    </div>
+    <div class="card">
+      <h2>Tell us about you</h2>
+      <p class="sub">Everyone in the group fills this in on their own device.</p>
+      <label>Your name</label>
+      <input type="text" id="pName" placeholder="e.g. Mariana">
+      <div class="row2">
+        <div>
+          <label>Age</label>
+          <input type="number" id="pAge" min="1" max="120" placeholder="22">
+        </div>
+        <div>
+          <label>Your budget (€)</label>
+          <input type="number" id="pBudget" min="0" placeholder="30">
+        </div>
+      </div>
+      <label>What are you in the mood for? (pick 1–3)</label>
+      <div class="tags" id="tagWrap">
+        ${PREF_OPTIONS.map(p=>`<button type="button" class="tag" data-k="${p.k}">${p.label}</button>`).join('')}
+      </div>
+      <div id="profErr"></div>
+      <button class="btn btn-primary" id="submitProfile">${isLeader? 'Save & continue to lobby' : 'Save & join lobby'}</button>
+    </div>
+  `);
+
+  document.querySelectorAll('#tagWrap .tag').forEach(btn=>{
+    btn.onclick = ()=>{
+      const k = btn.dataset.k;
+      if(selected.has(k)){ selected.delete(k); btn.classList.remove('active'); }
+      else{
+        if(selected.size>=3) return;
+        selected.add(k); btn.classList.add('active');
+      }
+    };
+  });
+
+  document.getElementById('submitProfile').onclick = async ()=>{
+    const name = document.getElementById('pName').value.trim();
+    const age = document.getElementById('pAge').value;
+    const budget = document.getElementById('pBudget').value;
+    const errBox = document.getElementById('profErr');
+    errBox.innerHTML='';
+    if(!name || !age || !budget || selected.size===0){
+      errBox.innerHTML = `<div class="error-msg">Fill in your name, age, budget, and at least one preference.</div>`;
+      return;
+    }
+    let party = await getParty(currentCode);
+    if(!party){ errBox.innerHTML = `<div class="error-msg">This party no longer exists.</div>`; return; }
+    party.members[deviceId] = {
+      name, age:Number(age), budget:Number(budget),
+      prefs:Array.from(selected), ready:true, joinedAt:Date.now()
+    };
+    if(isLeader) party.leaderId = deviceId;
+    await setParty(currentCode, party);
+    screenLobby(isLeader);
+  };
+}
+
+/* ---------------- SCREEN: LOBBY ---------------- */
+function screenLobby(isLeader){
+  stopPoll();
+  renderLobby(isLeader, null);
+  pollTimer = setInterval(async ()=>{
+    const party = await getParty(currentCode);
+    if(!party) return;
+    if(party.status === 'searching' || party.status === 'done'){
+      stopPoll();
+      screenResults();
+      return;
+    }
+    renderLobby(isLeader, party);
+  }, 2200);
+  // initial fetch right away
+  getParty(currentCode).then(p=> p && renderLobby(isLeader, p));
+}
+
+function renderLobby(isLeader, party){
+  if(!party){
+    render(`<div class="card"><h2>Loading party…</h2></div>`);
+    return;
+  }
+  const members = Object.values(party.members||{});
+  const rows = members.map(m=>`
+    <div class="member-row">
+      <div>
+        <div class="who">${escapeHtml(m.name)}</div>
+        <div class="meta">${m.age} yrs · €${m.budget} · ${m.prefs.map(prettyPref).join(', ')}</div>
+      </div>
+      <span class="badge ready">ready</span>
+    </div>
+  `).join('') || `<p class="sub">No one has joined yet.</p>`;
+
+  const leaderControls = isLeader ? `
+    <label>General area (e.g. Lisbon, Cascais...)</label>
+    <input type="text" id="locInput" placeholder="Lisbon" value="${party.location? escapeHtml(party.location):''}">
+    <div id="lobbyErr"></div>
+    <button class="btn btn-primary" id="searchBtn" ${members.length===0?'disabled':''}>Search hangout spots</button>
+    <p class="hint">${members.length} ${members.length===1?'person has':'people have'} joined so far. You can search anytime — new joiners just won't be counted.</p>
+  ` : `
+    <p class="hint">Waiting for the party leader to pick an area and hit search…</p>
+  `;
+
+  render(`
+    <div class="ticket">
+      <div class="label">Party code — share this</div>
+      <div class="code">${currentCode}</div>
+    </div>
+    <div class="card">
+      <h2>Lobby</h2>
+      <p class="sub">${members.length} joined</p>
+      ${rows}
+    </div>
+    <div class="card">
+      ${leaderControls}
+    </div>
+    <button class="small-link" id="leaveBtn">Leave / start over</button>
+  `);
+
+  document.getElementById('leaveBtn').onclick = ()=>{
+    stopPoll();
+    localStorage.removeItem('p2g_party_code');
+    localStorage.removeItem('p2g_is_leader');
+    currentCode = null;
+    screenHome();
+  };
+
+  if(isLeader){
+    document.getElementById('searchBtn').onclick = async ()=>{
+      const loc = document.getElementById('locInput').value.trim();
+      const errBox = document.getElementById('lobbyErr');
+      if(!loc){ errBox.innerHTML = `<div class="error-msg">Type a general area first.</div>`; return; }
+      let fresh = await getParty(currentCode);
+      fresh.location = loc;
+      fresh.status = 'searching';
+      await setParty(currentCode, fresh);
+      stopPoll();
+      screenResults();
+    };
+  }
+}
+
+function prettyPref(k){
+  const f = PREF_OPTIONS.find(p=>p.k===k);
+  return f? f.label : k;
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------------- SCREEN: RESULTS ---------------- */
+async function screenResults(){
+  render(`<div class="card"><h2>Checking the weather & matching spots…</h2><p class="sub">One moment.</p></div>`);
+  const party = await getParty(currentCode);
+  if(!party){ screenHome(); return; }
+  const members = Object.values(party.members||{});
+  const weather = await fetchWeather(party.location);
+  const suggestions = buildSuggestions(party.location, members, weather);
+
+  if(party.status !== 'done'){
+    party.status = 'done';
+    await setParty(currentCode, party);
+  }
+
+  const wEmoji = weather.emoji;
+  render(`
+    <div class="card">
+      <h2>Spots in ${escapeHtml(party.location)}</h2>
+      <p class="sub">Based on ${members.length} ${members.length===1?'person':'people'}'s budget &amp; preferences.</p>
+      <div class="weather-strip">
+        <div class="emoji">${wEmoji}</div>
+        <div class="wtext">
+          <strong>${weather.label}, ${weather.temp}°C</strong>
+          <span>${weather.note}</span>
+        </div>
+      </div>
+      ${suggestions.map(spotCard).join('')}
+    </div>
+    <button class="btn btn-secondary" id="reSearch">Search again</button>
+    <button class="small-link" id="newParty">Start a new party</button>
+  `);
+
+  document.getElementById('reSearch').onclick = ()=> screenResults();
+  document.getElementById('newParty').onclick = ()=>{
+    localStorage.removeItem('p2g_party_code');
+    localStorage.removeItem('p2g_is_leader');
+    currentCode = null;
+    screenHome();
+  };
+}
+
+function spotCard(s){
+  return `
+    <div class="spot">
+      <div class="spot-top">
+        <div>
+          <div class="cat">${s.cat}</div>
+          <h3>${s.name}</h3>
+        </div>
+        <span class="fit">~€${s.cost}/person</span>
+      </div>
+      <p>${s.desc}</p>
+      <div class="tagsrow">
+        ${s.tags.map(t=>`<span class="mini">${t}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- WEATHER ---------------- */
+async function fetchWeather(location){
+  try{
+    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`);
+    const geo = await geoRes.json();
+    if(!geo.results || !geo.results.length) throw new Error('no geo');
+    const {latitude, longitude} = geo.results[0];
+    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
+    const w = await wRes.json();
+    const code = w.current.weather_code;
+    const temp = Math.round(w.current.temperature_2m);
+    return interpretWeather(code, temp);
+  }catch(e){
+    return { label:'Mild', temp:18, code:1, emoji:'⛅', note:'Couldn\'t reach live weather — assuming pleasant conditions.', isOutdoorFriendly:true, isRainy:false };
+  }
+}
+
+function interpretWeather(code, temp){
+  // WMO weather codes simplified
+  const rainy = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(code);
+  const stormy = [95,96,99].includes(code);
+  const snowy = [71,73,75,77,85,86].includes(code);
+  const cloudy = [1,2,3,45,48].includes(code);
+  const clear = [0].includes(code);
+
+  let label, emoji, note, isOutdoorFriendly;
+  if(stormy){ label='Stormy'; emoji='⛈️'; note='Thunderstorms expected — definitely staying indoors.'; isOutdoorFriendly=false; }
+  else if(rainy){ label='Rainy'; emoji='🌧️'; note='Rain in the area — indoor spots only.'; isOutdoorFriendly=false; }
+  else if(snowy){ label='Snowy'; emoji='❄️'; note='Snow around — cozy indoor spots recommended.'; isOutdoorFriendly=false; }
+  else if(clear && temp>=14){ label='Clear'; emoji='☀️'; note='Great conditions for outdoor plans too.'; isOutdoorFriendly=true; }
+  else if(cloudy){ label='Cloudy'; emoji='⛅'; note='Cloudy but dry — outdoor spots are fine.'; isOutdoorFriendly=true; }
+  else { label='Cool'; emoji='🌥️'; note='A bit chilly — outdoor okay if bundled up.'; isOutdoorFriendly= temp>=10; }
+
+  return { label, emoji, note, temp, code, isOutdoorFriendly, isRainy: rainy||stormy||snowy };
+}
+
+/* ---------------- SUGGESTION ENGINE ---------------- */
+const VENUE_TEMPLATES = {
+  chill: [
+    {name:'{loc} Park Lawn', desc:'Open green space with benches and shade — easy, free, low-key.', tags:['free','outdoor'], outdoor:true, costFactor:0.1},
+    {name:'The Quiet Corner Lounge', desc:'Sofa seating, soft lighting, good for a relaxed catch-up.', tags:['indoor','cozy'], outdoor:false, costFactor:0.4},
+    {name:'{loc} Riverside Deck', desc:'Casual deck bar right on the water, laid-back crowd.', tags:['outdoor','drinks'], outdoor:true, costFactor:0.5},
+  ],
+  romantic: [
+    {name:'Vista do Pôr do Sol', desc:'Hilltop terrace with a sunset view over the city — great for two.', tags:['view','outdoor'], outdoor:true, costFactor:0.6},
+    {name:'Candlelight Bistro {loc}', desc:'Small intimate restaurant, dim lighting, tasting menu.', tags:['dinner','intimate'], outdoor:false, costFactor:1.1},
+    {name:'{loc} Botanical Garden', desc:'Quiet paths and flowers, a calm romantic stroll.', tags:['outdoor','scenic'], outdoor:true, costFactor:0.15},
+  ],
+  games: [
+    {name:'{loc} Arcade & Bowling', desc:'Retro arcade machines plus bowling lanes, good group energy.', tags:['indoor','active'], outdoor:false, costFactor:0.7},
+    {name:'Escape Room Co.', desc:'60-minute themed escape room, books for groups.', tags:['indoor','puzzle'], outdoor:false, costFactor:0.9},
+    {name:'{loc} Board Game Café', desc:'Wall of board games with coffee and snacks while you play.', tags:['indoor','chill'], outdoor:false, costFactor:0.5},
+  ],
+  restaurant: [
+    {name:'Tasca do Bairro', desc:'Traditional local dishes, shareable plates, lively atmosphere.', tags:['dinner','local'], outdoor:false, costFactor:0.9},
+    {name:'{loc} Street Food Market', desc:'Multiple stalls under one roof — everyone picks their own thing.', tags:['casual','variety'], outdoor:false, costFactor:0.5},
+    {name:'Rooftop Grill {loc}', desc:'Grilled dishes with a skyline view, livelier on weekends.', tags:['dinner','view'], outdoor:true, costFactor:1.2},
+  ],
+  coffee: [
+    {name:'{loc} Specialty Coffee Roasters', desc:'Bright, minimal café with pour-over and pastries.', tags:['indoor','casual'], outdoor:false, costFactor:0.25},
+    {name:'Corner Bakery & Coffee', desc:'Coffee plus fresh pastries, good for a quick easy meet.', tags:['indoor','quick'], outdoor:false, costFactor:0.2},
+    {name:'{loc} Garden Café', desc:'Coffee shop with an outdoor patio under trees.', tags:['outdoor','relaxed'], outdoor:true, costFactor:0.3},
+  ],
+  nightlife: [
+    {name:'{loc} Rooftop Bar', desc:'Cocktails with a view, picks up after 9pm.', tags:['drinks','view'], outdoor:true, costFactor:1.0},
+    {name:'Live Music Cellar', desc:'Underground venue with live bands most nights.', tags:['indoor','music'], outdoor:false, costFactor:0.8},
+    {name:'{loc} Night Market', desc:'Late-night food stalls and music, casual and social.', tags:['outdoor','food'], outdoor:true, costFactor:0.6},
+  ],
+  outdoors: [
+    {name:'{loc} Coastal Trail', desc:'Easy walking trail with sea or river views.', tags:['free','active'], outdoor:true, costFactor:0.05},
+    {name:'{loc} Viewpoint Hike', desc:'Short hike up to a lookout point over the city.', tags:['active','scenic'], outdoor:true, costFactor:0.1},
+    {name:'{loc} Public Pool & Sundeck', desc:'Outdoor pool with loungers, good on warm days.', tags:['outdoor','active'], outdoor:true, costFactor:0.4},
+  ],
+  culture: [
+    {name:'{loc} Museum of Modern Art', desc:'Rotating exhibits, usually has a quiet café inside too.', tags:['indoor','art'], outdoor:false, costFactor:0.4},
+    {name:'Old Town Walking Tour', desc:'Guided or self-walk through the historic district.', tags:['outdoor','history'], outdoor:true, costFactor:0.3},
+    {name:'{loc} Independent Cinema', desc:'Small cinema showing indie and classic films.', tags:['indoor','movies'], outdoor:false, costFactor:0.5},
+  ],
+};
+
+function buildSuggestions(location, members, weather){
+  // tally preference votes
+  const tally = {};
+  members.forEach(m => m.prefs.forEach(p => { tally[p] = (tally[p]||0)+1; }));
+  let prefOrder = Object.keys(tally).sort((a,b)=> tally[b]-tally[a]);
+  if(prefOrder.length===0) prefOrder = ['chill','coffee'];
+
+  const avgBudget = members.length
+    ? Math.round(members.reduce((s,m)=>s+m.budget,0)/members.length)
+    : 30;
+  const minBudget = members.length ? Math.min(...members.map(m=>m.budget)) : avgBudget;
+
+  let pool = [];
+  prefOrder.forEach(p=>{
+    (VENUE_TEMPLATES[p]||[]).forEach(v=> pool.push({...v, cat: prettyPref(p)}));
+  });
+  // fallback fill if too few categories selected overall
+  if(pool.length < 5){
+    Object.keys(VENUE_TEMPLATES).forEach(k=>{
+      VENUE_TEMPLATES[k].forEach(v=> pool.push({...v, cat: prettyPref(k)}));
+    });
+  }
+
+  if(!weather.isOutdoorFriendly){
+    pool = pool.filter(v=> !v.outdoor);
+  }
+
+  // dedupe by name, then take a spread across categories
+  const seen = new Set();
+  pool = pool.filter(v=>{
+    const key = v.name;
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+
+  // sort: prefer cheaper-than-min-budget first, then keep category variety
+  pool.sort((a,b)=>{
+    const costA = Math.max(8, Math.round(avgBudget * a.costFactor));
+    const costB = Math.max(8, Math.round(avgBudget * b.costFactor));
+    const fitA = costA <= minBudget ? 0 : 1;
+    const fitB = costB <= minBudget ? 0 : 1;
+    return fitA - fitB;
+  });
+
+  const picked = [];
+  const usedCats = new Set();
+  for(const v of pool){
+    if(picked.length>=6) break;
+    if(usedCats.has(v.cat) && picked.length < pool.length && usedCats.size < prefOrder.length) continue;
+    usedCats.add(v.cat);
+    picked.push(v);
+  }
+  // if still short, fill remaining
+  for(const v of pool){
+    if(picked.length>=5) break;
+    if(!picked.includes(v)) picked.push(v);
+  }
+
+  return picked.slice(0,5).map(v=>({
+    name: v.name.replace(/{loc}/g, location),
+    desc: v.desc,
+    cat: v.cat,
+    tags: [...v.tags, weather.isOutdoorFriendly? (v.outdoor?'good in this weather':'') : ''].filter(Boolean),
+    cost: Math.max(8, Math.round(avgBudget * v.costFactor)),
+  }));
+}
+
+/* ---------------- BOOT ---------------- */
+(async function boot(){
+  if(!firebaseReady){ render(''); return; }
+  if(currentCode){
+    const isLeader = localStorage.getItem('p2g_is_leader') === '1';
+    const party = await getParty(currentCode);
+    if(party && party.members && party.members[deviceId]){
+      if(party.status === 'searching' || party.status === 'done'){
+        screenResults();
+      } else {
+        screenLobby(isLeader);
+      }
+      return;
+    }
+  }
+  screenHome();
+})();
+</script>
+</body>
+</html>
