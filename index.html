@@ -9,6 +9,15 @@
 <!-- Firebase (free, no backend code to write — see README / setup instructions) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- Google Maps Places API — used to look up real venues, ratings, and photos.
+     This needs a DIFFERENT API key than the Firebase one above. See setup notes. -->
+<script>
+  window.mapsReady = false;
+  window.onGoogleMapsLoaded = function(){ window.mapsReady = true; };
+</script>
+<script async
+     src="https://maps.googleapis.com/maps/api/js?key=PASTE_YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=places&callback=onGoogleMapsLoaded">
+   </script>
 <style>
   :root{
     --dusk:#1B1F3B;
@@ -274,6 +283,33 @@
     padding:3px 8px;
     border-radius:999px;
   }
+  .real-spot{cursor:pointer;}
+  .real-spot:hover{border-color:var(--amber);}
+  .hover-preview{
+    max-height:0;
+    opacity:0;
+    overflow:hidden;
+    margin-top:0;
+    transition:max-height .25s ease, opacity .2s ease, margin-top .25s ease;
+  }
+  .real-spot:hover .hover-preview,
+  .real-spot:focus .hover-preview,
+  .real-spot:focus-visible .hover-preview{
+    max-height:280px;
+    opacity:1;
+    margin-top:10px;
+  }
+  .hover-photo{
+    width:100%;
+    max-height:160px;
+    object-fit:cover;
+    border-radius:10px;
+    display:block;
+    margin-bottom:6px;
+    background:#ece6d6;
+  }
+  .hover-desc{font-size:0.85rem; color:#52546b; line-height:1.4; margin:0;}
+  .photo-credit{font-size:0.68rem; color:#9a9eb4; margin:4px 0 0;}
 
   .error-msg{
     color:#b3413c;
@@ -318,6 +354,17 @@ try {
   firebaseReady = true;
 } catch (e) {
   console.error('Firebase init failed:', e);
+}
+
+/* Waits for the Google Maps script tag (loaded in <head>) to finish.
+   Resolves immediately if it's already loaded. */
+function waitForMaps(){
+  return new Promise(resolve=>{
+    if(window.mapsReady) return resolve();
+    const check = setInterval(()=>{
+      if(window.mapsReady){ clearInterval(check); resolve(); }
+    }, 100);
+  });
 }
 
 /* ---------------- STATE & STORAGE HELPERS ---------------- */
@@ -658,17 +705,21 @@ async function screenResults(){
   if(!party){ screenHome(); return; }
   const members = Object.values(party.members||{});
   const weather = await fetchWeather(party.location);
-  const suggestions = buildSuggestions(party.location, members, weather);
+  const suggestions = await fetchRealSpots(party.location, members, weather);
 
   if(party.status !== 'done'){
     await updateParty(currentCode, { status: 'done' });
   }
 
   const wEmoji = weather.emoji;
+  const spotsHtml = suggestions.length
+    ? suggestions.map(spotCard).join('')
+    : `<p class="sub">Couldn't find real venues for "${escapeHtml(party.location)}". Double-check your Google Maps API key/billing setup, or try a bigger or nearby place name.</p>`;
+
   render(`
     <div class="card">
       <h2>Spots in ${escapeHtml(party.location)}</h2>
-      <p class="sub">Based on ${members.length} ${members.length===1?'person':'people'}'s budget &amp; preferences.</p>
+      <p class="sub">Based on ${members.length} ${members.length===1?'person':'people'}'s preferences.</p>
       <div class="weather-strip">
         <div class="emoji">${wEmoji}</div>
         <div class="wtext">
@@ -676,11 +727,21 @@ async function screenResults(){
           <span>${weather.note}</span>
         </div>
       </div>
-      ${suggestions.map(spotCard).join('')}
+      ${spotsHtml}
+      ${suggestions.length ? `<p class="hint" style="margin-top:6px;">Spots, ratings, and photos provided by Google.</p>` : ''}
     </div>
     <button class="btn btn-secondary" id="reSearch">Search again</button>
     <button class="small-link" id="newParty">Start a new party</button>
   `);
+
+  document.querySelectorAll('.real-spot').forEach(el=>{
+    const open = ()=>{
+      const uri = el.getAttribute('data-maps-uri');
+      if(uri) window.open(uri, '_blank', 'noopener');
+    };
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); open(); } });
+  });
 
   document.getElementById('reSearch').onclick = ()=> screenResults();
   document.getElementById('newParty').onclick = ()=>{
@@ -692,18 +753,26 @@ async function screenResults(){
 }
 
 function spotCard(s){
+  const ratingText = s.rating
+    ? `★ ${s.rating}${s.userRatingCount ? ` (${s.userRatingCount})` : ''}`
+    : 'No rating yet';
   return `
-    <div class="spot">
+    <div class="spot real-spot" data-maps-uri="${escapeHtml(s.mapsUri)}" tabindex="0" role="link" aria-label="Open ${escapeHtml(s.name)} in Google Maps">
       <div class="spot-top">
         <div>
           <div class="cat">${s.cat}</div>
-          <h3>${s.name}</h3>
+          <h3>${escapeHtml(s.name)}</h3>
         </div>
-        <span class="fit">~€${s.cost}/person</span>
+        <span class="fit">${ratingText}</span>
       </div>
-      <p>${s.desc}</p>
+      <div class="hover-preview">
+        ${s.photoUri ? `<img class="hover-photo" src="${s.photoUri}" alt="Photo of ${escapeHtml(s.name)}">` : ''}
+        <p class="hover-desc">${escapeHtml(s.address || '')}</p>
+        ${s.photoCredit ? `<p class="photo-credit">Photo: ${escapeHtml(s.photoCredit)}</p>` : ''}
+      </div>
       <div class="tagsrow">
-        ${s.tags.map(t=>`<span class="mini">${t}</span>`).join('')}
+        ${s.priceSymbol ? `<span class="mini">${escapeHtml(s.priceSymbol)}</span>` : ''}
+        <span class="mini">Hover for preview · click to open in Maps ↗</span>
       </div>
     </div>
   `;
@@ -745,122 +814,110 @@ function interpretWeather(code, temp){
   return { label, emoji, note, temp, code, isOutdoorFriendly, isRainy: rainy||stormy||snowy };
 }
 
-/* ---------------- SUGGESTION ENGINE ---------------- */
-const VENUE_TEMPLATES = {
-  chill: [
-    {name:'{loc} Park Lawn', desc:'Open green space with benches and shade — easy, free, low-key.', tags:['free','outdoor'], outdoor:true, costFactor:0.1},
-    {name:'The Quiet Corner Lounge', desc:'Sofa seating, soft lighting, good for a relaxed catch-up.', tags:['indoor','cozy'], outdoor:false, costFactor:0.4},
-    {name:'{loc} Riverside Deck', desc:'Casual deck bar right on the water, laid-back crowd.', tags:['outdoor','drinks'], outdoor:true, costFactor:0.5},
-  ],
-  romantic: [
-    {name:'Vista do Pôr do Sol', desc:'Hilltop terrace with a sunset view over the city — great for two.', tags:['view','outdoor'], outdoor:true, costFactor:0.6},
-    {name:'Candlelight Bistro {loc}', desc:'Small intimate restaurant, dim lighting, tasting menu.', tags:['dinner','intimate'], outdoor:false, costFactor:1.1},
-    {name:'{loc} Botanical Garden', desc:'Quiet paths and flowers, a calm romantic stroll.', tags:['outdoor','scenic'], outdoor:true, costFactor:0.15},
-  ],
-  games: [
-    {name:'{loc} Arcade & Bowling', desc:'Retro arcade machines plus bowling lanes, good group energy.', tags:['indoor','active'], outdoor:false, costFactor:0.7},
-    {name:'Escape Room Co.', desc:'60-minute themed escape room, books for groups.', tags:['indoor','puzzle'], outdoor:false, costFactor:0.9},
-    {name:'{loc} Board Game Café', desc:'Wall of board games with coffee and snacks while you play.', tags:['indoor','chill'], outdoor:false, costFactor:0.5},
-  ],
-  restaurant: [
-    {name:'Tasca do Bairro', desc:'Traditional local dishes, shareable plates, lively atmosphere.', tags:['dinner','local'], outdoor:false, costFactor:0.9},
-    {name:'{loc} Street Food Market', desc:'Multiple stalls under one roof — everyone picks their own thing.', tags:['casual','variety'], outdoor:false, costFactor:0.5},
-    {name:'Rooftop Grill {loc}', desc:'Grilled dishes with a skyline view, livelier on weekends.', tags:['dinner','view'], outdoor:true, costFactor:1.2},
-  ],
-  coffee: [
-    {name:'{loc} Specialty Coffee Roasters', desc:'Bright, minimal café with pour-over and pastries.', tags:['indoor','casual'], outdoor:false, costFactor:0.25},
-    {name:'Corner Bakery & Coffee', desc:'Coffee plus fresh pastries, good for a quick easy meet.', tags:['indoor','quick'], outdoor:false, costFactor:0.2},
-    {name:'{loc} Garden Café', desc:'Coffee shop with an outdoor patio under trees.', tags:['outdoor','relaxed'], outdoor:true, costFactor:0.3},
-  ],
-  nightlife: [
-    {name:'{loc} Rooftop Bar', desc:'Cocktails with a view, picks up after 9pm.', tags:['drinks','view'], outdoor:true, costFactor:1.0},
-    {name:'Live Music Cellar', desc:'Underground venue with live bands most nights.', tags:['indoor','music'], outdoor:false, costFactor:0.8},
-    {name:'{loc} Night Market', desc:'Late-night food stalls and music, casual and social.', tags:['outdoor','food'], outdoor:true, costFactor:0.6},
-  ],
-  outdoors: [
-    {name:'{loc} Coastal Trail', desc:'Easy walking trail with sea or river views.', tags:['free','active'], outdoor:true, costFactor:0.05},
-    {name:'{loc} Viewpoint Hike', desc:'Short hike up to a lookout point over the city.', tags:['active','scenic'], outdoor:true, costFactor:0.1},
-    {name:'{loc} Public Pool & Sundeck', desc:'Outdoor pool with loungers, good on warm days.', tags:['outdoor','active'], outdoor:true, costFactor:0.4},
-  ],
-  culture: [
-    {name:'{loc} Museum of Modern Art', desc:'Rotating exhibits, usually has a quiet café inside too.', tags:['indoor','art'], outdoor:false, costFactor:0.4},
-    {name:'Old Town Walking Tour', desc:'Guided or self-walk through the historic district.', tags:['outdoor','history'], outdoor:true, costFactor:0.3},
-    {name:'{loc} Independent Cinema', desc:'Small cinema showing indie and classic films.', tags:['indoor','movies'], outdoor:false, costFactor:0.5},
-  ],
+/* ---------------- REAL VENUE LOOKUP (Google Places) ----------------
+   Instead of inventing fictional venue names, this searches Google
+   Places for real businesses matching the group's top preference(s),
+   biased indoor/outdoor by the weather, and returns real ratings,
+   photos, and a working Google Maps link for each result. */
+const CATEGORY_QUERY_TERMS = {
+  chill:      { outdoor: 'park to relax in',              indoor: 'cozy lounge or wine bar' },
+  romantic:   { outdoor: 'romantic scenic viewpoint',      indoor: 'romantic restaurant' },
+  games:      { outdoor: 'outdoor activity venue',         indoor: 'arcade or board game cafe' },
+  restaurant: { outdoor: 'restaurant with outdoor seating',indoor: 'restaurant' },
+  coffee:     { outdoor: 'cafe with outdoor seating',      indoor: 'coffee shop' },
+  nightlife:  { outdoor: 'rooftop bar',                    indoor: 'bar or live music venue' },
+  outdoors:   { outdoor: 'park or nature trail',           indoor: 'indoor recreation center' },
+  culture:    { outdoor: 'historic walking area',          indoor: 'museum or art gallery' },
 };
 
-function buildSuggestions(location, members, weather){
-  // tally preference votes
+// rating + priceLevel both fall in Google's "Enterprise + Atmosphere" pricing
+// tier for Text Search (1,000 free requests/month, then billed per request) —
+// requesting both together doesn't cost more than requesting just one.
+const PLACE_FIELDS = ['displayName','formattedAddress','googleMapsURI','photos','rating','userRatingCount','priceLevel'];
+
+function priceLevelToSymbol(pl){
+  if(!pl) return null;
+  const s = String(pl).toLowerCase();
+  if(s.includes('free')) return 'Free';
+  if(s.includes('very')) return '€€€€';
+  if(s.includes('expensive')) return '€€€';
+  if(s.includes('moderate')) return '€€';
+  if(s.includes('inexpensive')) return '€';
+  return null;
+}
+
+async function searchCategory(categoryKey, location, weather, count){
+  const terms = CATEGORY_QUERY_TERMS[categoryKey] || CATEGORY_QUERY_TERMS.chill;
+  const phrase = weather.isOutdoorFriendly ? terms.outdoor : terms.indoor;
+  const query = `${phrase} in ${location}`;
+  try{
+    const { Place } = await google.maps.importLibrary('places');
+    const { places } = await Place.searchByText({
+      textQuery: query,
+      fields: PLACE_FIELDS,
+      maxResultCount: count,
+      language: 'en',
+    });
+    return (places || []).map(p => ({ place: p, cat: prettyPref(categoryKey) }));
+  }catch(e){
+    console.error('Place search failed for', categoryKey, e);
+    return [];
+  }
+}
+
+async function fetchRealSpots(location, members, weather){
+  await waitForMaps();
+
   const tally = {};
   members.forEach(m => m.prefs.forEach(p => { tally[p] = (tally[p]||0)+1; }));
   let prefOrder = Object.keys(tally).sort((a,b)=> tally[b]-tally[a]);
-  if(prefOrder.length===0) prefOrder = ['chill','coffee'];
+  if(prefOrder.length===0) prefOrder = ['chill'];
 
-  const avgBudget = members.length
-    ? Math.round(members.reduce((s,m)=>s+m.budget,0)/members.length)
-    : 30;
-  const minBudget = members.length ? Math.min(...members.map(m=>m.budget)) : avgBudget;
-
-  let pool = [];
-  prefOrder.forEach(p=>{
-    (VENUE_TEMPLATES[p]||[]).forEach(v=> pool.push({...v, cat: prettyPref(p)}));
-  });
-
-  if(!weather.isOutdoorFriendly){
-    pool = pool.filter(v=> !v.outdoor);
+  // Search the group's top category first; only spend a second request
+  // on the runner-up category if the first didn't return enough results.
+  let results = await searchCategory(prefOrder[0], location, weather, 5);
+  if(results.length < 5 && prefOrder[1]){
+    const more = await searchCategory(prefOrder[1], location, weather, 5);
+    results = results.concat(more);
   }
 
-  // fallback fill if too few venues survived (also weather-filtered,
-  // so a rainy day still ends up with a full set of indoor options)
-  if(pool.length < 5){
-    Object.keys(VENUE_TEMPLATES).forEach(k=>{
-      VENUE_TEMPLATES[k].forEach(v=>{
-        if(weather.isOutdoorFriendly || !v.outdoor){
-          pool.push({...v, cat: prettyPref(k)});
-        }
-      });
-    });
-  }
-
-  // dedupe by name, then take a spread across categories
+  // dedupe by place id, best-rated first
   const seen = new Set();
-  pool = pool.filter(v=>{
-    const key = v.name;
-    if(seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-
-  // sort: prefer cheaper-than-min-budget first, then keep category variety
-  pool.sort((a,b)=>{
-    const costA = Math.max(8, Math.round(avgBudget * a.costFactor));
-    const costB = Math.max(8, Math.round(avgBudget * b.costFactor));
-    const fitA = costA <= minBudget ? 0 : 1;
-    const fitB = costB <= minBudget ? 0 : 1;
-    return fitA - fitB;
-  });
-
-  const picked = [];
-  const usedCats = new Set();
-  for(const v of pool){
-    if(picked.length>=6) break;
-    if(usedCats.has(v.cat) && picked.length < pool.length && usedCats.size < prefOrder.length) continue;
-    usedCats.add(v.cat);
-    picked.push(v);
+  const deduped = [];
+  for(const r of results){
+    if(seen.has(r.place.id)) continue;
+    seen.add(r.place.id);
+    deduped.push(r);
   }
-  // if still short, fill remaining
-  for(const v of pool){
-    if(picked.length>=5) break;
-    if(!picked.includes(v)) picked.push(v);
-  }
+  deduped.sort((a,b)=> (b.place.rating||0) - (a.place.rating||0));
 
-  return picked.slice(0,5).map(v=>({
-    name: v.name.replace(/{loc}/g, location),
-    desc: v.desc,
-    cat: v.cat,
-    tags: [...v.tags, weather.isOutdoorFriendly? (v.outdoor?'good in this weather':'') : ''].filter(Boolean),
-    cost: Math.max(8, Math.round(avgBudget * v.costFactor)),
-  }));
+  return deduped.slice(0,5).map(r=>{
+    const p = r.place;
+    const photo = (p.photos && p.photos[0]) || null;
+    let photoUri = null, photoCredit = null;
+    if(photo){
+      try{
+        photoUri = photo.getURI({ maxWidth: 480, maxHeight: 320 });
+        photoCredit = (photo.authorAttributions && photo.authorAttributions[0])
+          ? photo.authorAttributions[0].displayName : null;
+      }catch(e){ /* photo unavailable — card still works without it */ }
+    }
+    const fallbackMapsSearch = 'https://www.google.com/maps/search/?api=1&query=' +
+      encodeURIComponent((p.displayName||'') + ' ' + (p.formattedAddress||''));
+    return {
+      name: p.displayName || 'Unnamed spot',
+      cat: r.cat,
+      rating: typeof p.rating === 'number' ? p.rating.toFixed(1) : null,
+      userRatingCount: p.userRatingCount || null,
+      address: p.formattedAddress || '',
+      photoUri,
+      photoCredit,
+      priceSymbol: priceLevelToSymbol(p.priceLevel),
+      mapsUri: p.googleMapsURI || fallbackMapsSearch,
+    };
+  });
 }
+
 
 /* ---------------- BOOT ---------------- */
 (async function boot(){
