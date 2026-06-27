@@ -714,7 +714,11 @@ async function screenResults(){
   const wEmoji = weather.emoji;
   const spotsHtml = suggestions.length
     ? suggestions.map(spotCard).join('')
-    : `<p class="sub">Couldn't find real venues for "${escapeHtml(party.location)}". Double-check your Google Maps API key/billing setup, or try a bigger or nearby place name.</p>`;
+    : `<p class="sub">Couldn't find real venues for "${escapeHtml(party.location)}".${
+        lastPlacesError
+          ? ` Error from Google: <strong>${escapeHtml(lastPlacesError)}</strong>`
+          : ' Try a bigger or nearby place name.'
+      }</p>`;
 
   render(`
     <div class="card">
@@ -846,6 +850,8 @@ function priceLevelToSymbol(pl){
   return null;
 }
 
+let lastPlacesError = null;
+
 async function searchCategory(categoryKey, location, weather, count){
   const terms = CATEGORY_QUERY_TERMS[categoryKey] || CATEGORY_QUERY_TERMS.chill;
   const phrase = weather.isOutdoorFriendly ? terms.outdoor : terms.indoor;
@@ -860,12 +866,14 @@ async function searchCategory(categoryKey, location, weather, count){
     });
     return (places || []).map(p => ({ place: p, cat: prettyPref(categoryKey) }));
   }catch(e){
+    lastPlacesError = (e && e.message) ? e.message : String(e);
     console.error('Place search failed for', categoryKey, e);
     return [];
   }
 }
 
 async function fetchRealSpots(location, members, weather){
+  lastPlacesError = null;
   await waitForMaps();
 
   const tally = {};
