@@ -370,6 +370,23 @@ async function setParty(code, data){
     console.error('setParty failed:', e);
   }
 }
+/* Targeted writes — only touch the specific field/member instead of
+   overwriting the whole party object, so two devices writing at the
+   same time can't clobber each other's data. */
+async function updateParty(code, patch){
+  try{
+    await db.ref('parties/' + code).update(patch);
+  }catch(e){
+    console.error('updateParty failed:', e);
+  }
+}
+async function setMember(code, memberId, data){
+  try{
+    await db.ref('parties/' + code + '/members/' + memberId).set(data);
+  }catch(e){
+    console.error('setMember failed:', e);
+  }
+}
 
 let currentCode = localStorage.getItem('p2g_party_code') || null;
 let pollTimer = null;
@@ -515,14 +532,12 @@ function screenProfile(isLeader){
       errBox.innerHTML = `<div class="error-msg">Fill in your name, age, budget, and at least one preference.</div>`;
       return;
     }
-    let party = await getParty(currentCode);
+    const party = await getParty(currentCode);
     if(!party){ errBox.innerHTML = `<div class="error-msg">This party no longer exists.</div>`; return; }
-    party.members[deviceId] = {
+    await setMember(currentCode, deviceId, {
       name, age:Number(age), budget:Number(budget),
       prefs:Array.from(selected), ready:true, joinedAt:Date.now()
-    };
-    if(isLeader) party.leaderId = deviceId;
-    await setParty(currentCode, party);
+    });
     screenLobby(isLeader);
   };
 }
@@ -531,6 +546,8 @@ function screenProfile(isLeader){
 function screenLobby(isLeader){
   stopPoll();
   renderLobby(isLeader, null);
+  // initial fetch right away
+  getParty(currentCode).then(p=> p && renderLobby(isLeader, p));
   pollTimer = setInterval(async ()=>{
     const party = await getParty(currentCode);
     if(!party) return;
@@ -539,19 +556,14 @@ function screenLobby(isLeader){
       screenResults();
       return;
     }
-    renderLobby(isLeader, party);
+    // Only refresh the member list/count on poll ticks — never touch
+    // the location input, or the leader's in-progress typing gets wiped.
+    refreshLobbyMembers(isLeader, party);
   }, 2200);
-  // initial fetch right away
-  getParty(currentCode).then(p=> p && renderLobby(isLeader, p));
 }
 
-function renderLobby(isLeader, party){
-  if(!party){
-    render(`<div class="card"><h2>Loading party…</h2></div>`);
-    return;
-  }
-  const members = Object.values(party.members||{});
-  const rows = members.map(m=>`
+function memberRowsHtml(members){
+  return members.map(m=>`
     <div class="member-row">
       <div>
         <div class="who">${escapeHtml(m.name)}</div>
@@ -560,13 +572,37 @@ function renderLobby(isLeader, party){
       <span class="badge ready">ready</span>
     </div>
   `).join('') || `<p class="sub">No one has joined yet.</p>`;
+}
+
+function refreshLobbyMembers(isLeader, party){
+  const members = Object.values(party.members||{});
+  const countEl = document.getElementById('memberCountText');
+  const rowsEl = document.getElementById('memberRowsWrap');
+  if(!countEl || !rowsEl) return; // screen changed since this tick fired
+  countEl.textContent = `${members.length} joined`;
+  rowsEl.innerHTML = memberRowsHtml(members);
+  if(isLeader){
+    const searchBtn = document.getElementById('searchBtn');
+    const hintEl = document.getElementById('lobbyHint');
+    if(searchBtn) searchBtn.disabled = members.length===0;
+    if(hintEl) hintEl.textContent = `${members.length} ${members.length===1?'person has':'people have'} joined so far. You can search anytime — new joiners just won't be counted.`;
+  }
+}
+
+function renderLobby(isLeader, party){
+  if(!party){
+    render(`<div class="card"><h2>Loading party…</h2></div>`);
+    return;
+  }
+  const members = Object.values(party.members||{});
+  const rows = memberRowsHtml(members);
 
   const leaderControls = isLeader ? `
     <label>General area (e.g. Lisbon, Cascais...)</label>
     <input type="text" id="locInput" placeholder="Lisbon" value="${party.location? escapeHtml(party.location):''}">
     <div id="lobbyErr"></div>
     <button class="btn btn-primary" id="searchBtn" ${members.length===0?'disabled':''}>Search hangout spots</button>
-    <p class="hint">${members.length} ${members.length===1?'person has':'people have'} joined so far. You can search anytime — new joiners just won't be counted.</p>
+    <p class="hint" id="lobbyHint">${members.length} ${members.length===1?'person has':'people have'} joined so far. You can search anytime — new joiners just won't be counted.</p>
   ` : `
     <p class="hint">Waiting for the party leader to pick an area and hit search…</p>
   `;
@@ -578,8 +614,8 @@ function renderLobby(isLeader, party){
     </div>
     <div class="card">
       <h2>Lobby</h2>
-      <p class="sub">${members.length} joined</p>
-      ${rows}
+      <p class="sub" id="memberCountText">${members.length} joined</p>
+      <div id="memberRowsWrap">${rows}</div>
     </div>
     <div class="card">
       ${leaderControls}
@@ -600,10 +636,7 @@ function renderLobby(isLeader, party){
       const loc = document.getElementById('locInput').value.trim();
       const errBox = document.getElementById('lobbyErr');
       if(!loc){ errBox.innerHTML = `<div class="error-msg">Type a general area first.</div>`; return; }
-      let fresh = await getParty(currentCode);
-      fresh.location = loc;
-      fresh.status = 'searching';
-      await setParty(currentCode, fresh);
+      await updateParty(currentCode, { location: loc, status: 'searching' });
       stopPoll();
       screenResults();
     };
@@ -628,8 +661,7 @@ async function screenResults(){
   const suggestions = buildSuggestions(party.location, members, weather);
 
   if(party.status !== 'done'){
-    party.status = 'done';
-    await setParty(currentCode, party);
+    await updateParty(currentCode, { status: 'done' });
   }
 
   const wEmoji = weather.emoji;
@@ -773,15 +805,21 @@ function buildSuggestions(location, members, weather){
   prefOrder.forEach(p=>{
     (VENUE_TEMPLATES[p]||[]).forEach(v=> pool.push({...v, cat: prettyPref(p)}));
   });
-  // fallback fill if too few categories selected overall
-  if(pool.length < 5){
-    Object.keys(VENUE_TEMPLATES).forEach(k=>{
-      VENUE_TEMPLATES[k].forEach(v=> pool.push({...v, cat: prettyPref(k)}));
-    });
-  }
 
   if(!weather.isOutdoorFriendly){
     pool = pool.filter(v=> !v.outdoor);
+  }
+
+  // fallback fill if too few venues survived (also weather-filtered,
+  // so a rainy day still ends up with a full set of indoor options)
+  if(pool.length < 5){
+    Object.keys(VENUE_TEMPLATES).forEach(k=>{
+      VENUE_TEMPLATES[k].forEach(v=>{
+        if(weather.isOutdoorFriendly || !v.outdoor){
+          pool.push({...v, cat: prettyPref(k)});
+        }
+      });
+    });
   }
 
   // dedupe by name, then take a spread across categories
