@@ -6,18 +6,10 @@
 <title>Plan2Gether — find where to hang out</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<!-- Firebase (free, no backend code to write — see README / setup instructions) -->
+<!-- Firebase (free, no backend code to write) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<!-- Google Maps Places API — used to look up real venues, ratings, and photos.
-     This needs a DIFFERENT API key than the Firebase one above. See setup notes. -->
-<script>
-  window.mapsReady = false;
-  window.onGoogleMapsLoaded = function(){ window.mapsReady = true; };
-</script>
-<script async
-     src="https://maps.googleapis.com/maps/api/js?key=PASTE_YOUR_GOOGLE_MAPS_API_KEY_HERE&libraries=places&callback=onGoogleMapsLoaded">
-   </script>
+<!-- No Google Maps needed — we use Nominatim + Overpass API (both free, no key required) -->
 <style>
   :root{
     --dusk:#1B1F3B;
@@ -258,7 +250,10 @@
     padding:16px 16px;
     margin-bottom:12px;
     background:#fff;
+    cursor:pointer;
+    transition:border-color .15s;
   }
+  .spot:hover{border-color:var(--amber);}
   .spot-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
   .spot h3{font-family:'Fraunces',serif; margin:0 0 4px; font-size:1.08rem;}
   .spot .cat{
@@ -283,33 +278,11 @@
     padding:3px 8px;
     border-radius:999px;
   }
-  .real-spot{cursor:pointer;}
-  .real-spot:hover{border-color:var(--amber);}
-  .hover-preview{
-    max-height:0;
-    opacity:0;
-    overflow:hidden;
-    margin-top:0;
-    transition:max-height .25s ease, opacity .2s ease, margin-top .25s ease;
+  .spot .address{
+    font-size:0.83rem;
+    color:#52546b;
+    margin-top:6px;
   }
-  .real-spot:hover .hover-preview,
-  .real-spot:focus .hover-preview,
-  .real-spot:focus-visible .hover-preview{
-    max-height:280px;
-    opacity:1;
-    margin-top:10px;
-  }
-  .hover-photo{
-    width:100%;
-    max-height:160px;
-    object-fit:cover;
-    border-radius:10px;
-    display:block;
-    margin-bottom:6px;
-    background:#ece6d6;
-  }
-  .hover-desc{font-size:0.85rem; color:#52546b; line-height:1.4; margin:0;}
-  .photo-credit{font-size:0.68rem; color:#9a9eb4; margin:4px 0 0;}
 
   .error-msg{
     color:#b3413c;
@@ -337,15 +310,12 @@
 <script>
 /* =====================================================================
    FIREBASE SETUP — paste your config below.
-   See the setup instructions for how to get these 4 values
-   (it's a 2-minute free signup, no credit card, no backend code).
    ===================================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyBQGD2VvJPvYyOS3mgxJIp-uHOamvENoPQ",
   databaseURL: "https://plan2gether-ccf06-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "plan2gether-ccf06",
 };
-
 let db = null;
 let firebaseReady = false;
 try {
@@ -356,19 +326,7 @@ try {
   console.error('Firebase init failed:', e);
 }
 
-/* Waits for the Google Maps script tag (loaded in <head>) to finish.
-   Resolves immediately if it's already loaded. */
-function waitForMaps(){
-  return new Promise(resolve=>{
-    if(window.mapsReady) return resolve();
-    const check = setInterval(()=>{
-      if(window.mapsReady){ clearInterval(check); resolve(); }
-    }, 100);
-  });
-}
-
 /* ---------------- STATE & STORAGE HELPERS ---------------- */
-const screens = {};
 const routeEl = document.getElementById('route');
 
 function render(html){
@@ -398,9 +356,6 @@ function genCode(){
   return c;
 }
 
-/* Shared party data now lives in Firebase Realtime Database instead of
-   the Claude-artifact-only window.storage API, so any device with this
-   page open (and the same firebaseConfig) can read/write the same party. */
 async function getParty(code){
   try{
     const snap = await db.ref('parties/' + code).get();
@@ -417,9 +372,6 @@ async function setParty(code, data){
     console.error('setParty failed:', e);
   }
 }
-/* Targeted writes — only touch the specific field/member instead of
-   overwriting the whole party object, so two devices writing at the
-   same time can't clobber each other's data. */
 async function updateParty(code, patch){
   try{
     await db.ref('parties/' + code).update(patch);
@@ -462,7 +414,7 @@ function screenHome(){
   document.getElementById('goJoin').onclick = screenJoinCode;
 }
 
-/* ---------------- SCREEN: CREATE (leader makes code) ---------------- */
+/* ---------------- SCREEN: CREATE ---------------- */
 function screenCreate(){
   render(`
     <div class="card">
@@ -484,7 +436,7 @@ function screenCreate(){
   };
 }
 
-/* ---------------- SCREEN: JOIN (enter code) ---------------- */
+/* ---------------- SCREEN: JOIN ---------------- */
 function screenJoinCode(){
   render(`
     <div class="card">
@@ -593,7 +545,6 @@ function screenProfile(isLeader){
 function screenLobby(isLeader){
   stopPoll();
   renderLobby(isLeader, null);
-  // initial fetch right away
   getParty(currentCode).then(p=> p && renderLobby(isLeader, p));
   pollTimer = setInterval(async ()=>{
     const party = await getParty(currentCode);
@@ -603,8 +554,6 @@ function screenLobby(isLeader){
       screenResults();
       return;
     }
-    // Only refresh the member list/count on poll ticks — never touch
-    // the location input, or the leader's in-progress typing gets wiped.
     refreshLobbyMembers(isLeader, party);
   }, 2200);
 }
@@ -625,7 +574,7 @@ function refreshLobbyMembers(isLeader, party){
   const members = Object.values(party.members||{});
   const countEl = document.getElementById('memberCountText');
   const rowsEl = document.getElementById('memberRowsWrap');
-  if(!countEl || !rowsEl) return; // screen changed since this tick fired
+  if(!countEl || !rowsEl) return;
   countEl.textContent = `${members.length} joined`;
   rowsEl.innerHTML = memberRowsHtml(members);
   if(isLeader){
@@ -695,56 +644,50 @@ function prettyPref(k){
   return f? f.label : k;
 }
 function escapeHtml(s){
-  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 /* ---------------- SCREEN: RESULTS ---------------- */
 async function screenResults(){
-  render(`<div class="card"><h2>Checking the weather & matching spots…</h2><p class="sub">One moment.</p></div>`);
+  render(`<div class="card"><h2>Checking the weather &amp; matching spots…</h2><p class="sub">One moment.</p></div>`);
   const party = await getParty(currentCode);
   if(!party){ screenHome(); return; }
   const members = Object.values(party.members||{});
   const weather = await fetchWeather(party.location);
-  const suggestions = await fetchRealSpots(party.location, members, weather);
+  const suggestions = await fetchOSMSpots(party.location, members, weather);
 
   if(party.status !== 'done'){
     await updateParty(currentCode, { status: 'done' });
   }
 
-  const wEmoji = weather.emoji;
   const spotsHtml = suggestions.length
     ? suggestions.map(spotCard).join('')
-    : `<p class="sub">Couldn't find real venues for "${escapeHtml(party.location)}".${
-        lastPlacesError
-          ? ` Error from Google: <strong>${escapeHtml(lastPlacesError)}</strong>`
-          : ' Try a bigger or nearby place name.'
-      }</p>`;
+    : `<p class="sub">Couldn't find venues for "${escapeHtml(party.location)}". Try a bigger or nearby place name.</p>`;
 
   render(`
     <div class="card">
       <h2>Spots in ${escapeHtml(party.location)}</h2>
       <p class="sub">Based on ${members.length} ${members.length===1?'person':'people'}'s preferences.</p>
       <div class="weather-strip">
-        <div class="emoji">${wEmoji}</div>
+        <div class="emoji">${weather.emoji}</div>
         <div class="wtext">
           <strong>${weather.label}, ${weather.temp}°C</strong>
           <span>${weather.note}</span>
         </div>
       </div>
       ${spotsHtml}
-      ${suggestions.length ? `<p class="hint" style="margin-top:6px;">Spots, ratings, and photos provided by Google.</p>` : ''}
+      ${suggestions.length ? `<p class="hint" style="margin-top:6px;">Spots sourced from OpenStreetMap contributors.</p>` : ''}
     </div>
     <button class="btn btn-secondary" id="reSearch">Search again</button>
     <button class="small-link" id="newParty">Start a new party</button>
   `);
 
-  document.querySelectorAll('.real-spot').forEach(el=>{
-    const open = ()=>{
-      const uri = el.getAttribute('data-maps-uri');
+  document.querySelectorAll('.spot[data-osm-uri]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const uri = el.getAttribute('data-osm-uri');
       if(uri) window.open(uri, '_blank', 'noopener');
-    };
-    el.addEventListener('click', open);
-    el.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); open(); } });
+    });
+    el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.click(); } });
   });
 
   document.getElementById('reSearch').onclick = ()=> screenResults();
@@ -757,32 +700,26 @@ async function screenResults(){
 }
 
 function spotCard(s){
-  const ratingText = s.rating
-    ? `★ ${s.rating}${s.userRatingCount ? ` (${s.userRatingCount})` : ''}`
-    : 'No rating yet';
   return `
-    <div class="spot real-spot" data-maps-uri="${escapeHtml(s.mapsUri)}" tabindex="0" role="link" aria-label="Open ${escapeHtml(s.name)} in Google Maps">
+    <div class="spot" data-osm-uri="${escapeHtml(s.osmUri)}" tabindex="0" role="link" aria-label="Open ${escapeHtml(s.name)} on OpenStreetMap">
       <div class="spot-top">
         <div>
-          <div class="cat">${s.cat}</div>
+          <div class="cat">${escapeHtml(s.cat)}</div>
           <h3>${escapeHtml(s.name)}</h3>
         </div>
-        <span class="fit">${ratingText}</span>
+        ${s.openNow !== null ? `<span class="fit">${s.openNow ? '🟢 Open' : '🔴 Closed'}</span>` : ''}
       </div>
-      <div class="hover-preview">
-        ${s.photoUri ? `<img class="hover-photo" src="${s.photoUri}" alt="Photo of ${escapeHtml(s.name)}">` : ''}
-        <p class="hover-desc">${escapeHtml(s.address || '')}</p>
-        ${s.photoCredit ? `<p class="photo-credit">Photo: ${escapeHtml(s.photoCredit)}</p>` : ''}
-      </div>
+      ${s.address ? `<div class="address">📍 ${escapeHtml(s.address)}</div>` : ''}
       <div class="tagsrow">
-        ${s.priceSymbol ? `<span class="mini">${escapeHtml(s.priceSymbol)}</span>` : ''}
-        <span class="mini">Hover for preview · click to open in Maps ↗</span>
+        ${s.website ? `<span class="mini">🌐 Has website</span>` : ''}
+        ${s.phone ? `<span class="mini">📞 Has phone</span>` : ''}
+        <span class="mini">Click to open on OSM ↗</span>
       </div>
     </div>
   `;
 }
 
-/* ---------------- WEATHER ---------------- */
+/* ---------------- WEATHER (Open-Meteo, no key needed) ---------------- */
 async function fetchWeather(location){
   try{
     const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`);
@@ -800,7 +737,6 @@ async function fetchWeather(location){
 }
 
 function interpretWeather(code, temp){
-  // WMO weather codes simplified
   const rainy = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(code);
   const stormy = [95,96,99].includes(code);
   const snowy = [71,73,75,77,85,86].includes(code);
@@ -818,114 +754,141 @@ function interpretWeather(code, temp){
   return { label, emoji, note, temp, code, isOutdoorFriendly, isRainy: rainy||stormy||snowy };
 }
 
-/* ---------------- REAL VENUE LOOKUP (Google Places) ----------------
-   Instead of inventing fictional venue names, this searches Google
-   Places for real businesses matching the group's top preference(s),
-   biased indoor/outdoor by the weather, and returns real ratings,
-   photos, and a working Google Maps link for each result. */
-const CATEGORY_QUERY_TERMS = {
-  chill:      { outdoor: 'park to relax in',              indoor: 'cozy lounge or wine bar' },
-  romantic:   { outdoor: 'romantic scenic viewpoint',      indoor: 'romantic restaurant' },
-  games:      { outdoor: 'outdoor activity venue',         indoor: 'arcade or board game cafe' },
-  restaurant: { outdoor: 'restaurant with outdoor seating',indoor: 'restaurant' },
-  coffee:     { outdoor: 'cafe with outdoor seating',      indoor: 'coffee shop' },
-  nightlife:  { outdoor: 'rooftop bar',                    indoor: 'bar or live music venue' },
-  outdoors:   { outdoor: 'park or nature trail',           indoor: 'indoor recreation center' },
-  culture:    { outdoor: 'historic walking area',          indoor: 'museum or art gallery' },
+/* ---------------- VENUE LOOKUP via Nominatim + Overpass API ----------
+   Nominatim: free OSM geocoding (no key needed).
+   Overpass API: free OSM POI search (no key needed).
+   Both require a descriptive User-Agent header.                        */
+
+// Maps preference keys to OSM amenity/leisure/tourism tags
+// We keep two lists: indoor-biased and outdoor-biased
+const OSM_TAGS = {
+  chill:      { outdoor: [['leisure','park'],['amenity','biergarten']], indoor: [['amenity','bar'],['amenity','pub']] },
+  romantic:   { outdoor: [['tourism','viewpoint'],['leisure','park']], indoor: [['amenity','restaurant']] },
+  games:      { outdoor: [['leisure','mini_golf'],['leisure','sports_centre']], indoor: [['amenity','arcade'],['leisure','escape_game']] },
+  restaurant: { outdoor: [['amenity','restaurant'],['amenity','fast_food']], indoor: [['amenity','restaurant']] },
+  coffee:     { outdoor: [['amenity','cafe']], indoor: [['amenity','cafe']] },
+  nightlife:  { outdoor: [['amenity','bar'],['amenity','pub']], indoor: [['amenity','nightclub'],['amenity','bar']] },
+  outdoors:   { outdoor: [['leisure','park'],['leisure','nature_reserve'],['leisure','garden']], indoor: [['leisure','sports_centre']] },
+  culture:    { outdoor: [['tourism','monument'],['historic','*']], indoor: [['tourism','museum'],['tourism','gallery']] },
 };
 
-// rating + priceLevel both fall in Google's "Enterprise + Atmosphere" pricing
-// tier for Text Search (1,000 free requests/month, then billed per request) —
-// requesting both together doesn't cost more than requesting just one.
-const PLACE_FIELDS = ['displayName','formattedAddress','googleMapsURI','photos','rating','userRatingCount','priceLevel'];
+const USER_AGENT = 'Plan2Gether/1.0 (group hangout planner; contact via github)';
 
-function priceLevelToSymbol(pl){
-  if(!pl) return null;
-  const s = String(pl).toLowerCase();
-  if(s.includes('free')) return 'Free';
-  if(s.includes('very')) return '€€€€';
-  if(s.includes('expensive')) return '€€€';
-  if(s.includes('moderate')) return '€€';
-  if(s.includes('inexpensive')) return '€';
-  return null;
+/* Step 1: resolve city name → bounding box via Nominatim */
+async function geocodeCity(location){
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1&addressdetails=0`;
+  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept-Language': 'en' } });
+  const data = await res.json();
+  if(!data || !data.length) throw new Error('City not found: ' + location);
+  const r = data[0];
+  return {
+    lat: parseFloat(r.lat),
+    lon: parseFloat(r.lon),
+    // bbox is [south, north, west, east] from Nominatim but we want a radius instead
+  };
 }
 
-let lastPlacesError = null;
+/* Step 2: query Overpass for POIs near the city centre */
+async function overpassQuery(lat, lon, tagPairs, radiusMetres = 3000, limit = 8){
+  // Build a union of all tag conditions
+  const conditions = tagPairs.map(([k,v]) => {
+    const tagFilter = v === '*' ? `["${k}"]` : `["${k}"="${v}"]`;
+    return `node${tagFilter}(around:${radiusMetres},${lat},${lon});
+    way${tagFilter}(around:${radiusMetres},${lat},${lon});`;
+  }).join('\n');
 
-async function searchCategory(categoryKey, location, weather, count){
-  const terms = CATEGORY_QUERY_TERMS[categoryKey] || CATEGORY_QUERY_TERMS.chill;
-  const phrase = weather.isOutdoorFriendly ? terms.outdoor : terms.indoor;
-  const query = `${phrase} in ${location}`;
-  try{
-    const { Place } = await google.maps.importLibrary('places');
-    const { places } = await Place.searchByText({
-      textQuery: query,
-      fields: PLACE_FIELDS,
-      maxResultCount: count,
-      language: 'en',
-    });
-    return (places || []).map(p => ({ place: p, cat: prettyPref(categoryKey) }));
-  }catch(e){
-    lastPlacesError = (e && e.message) ? e.message : String(e);
-    console.error('Place search failed for', categoryKey, e);
-    return [];
+  const query = `[out:json][timeout:10];
+(
+  ${conditions}
+);
+out center ${limit} qt;`;
+
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
+    body: 'data=' + encodeURIComponent(query),
+  });
+  const data = await res.json();
+  return data.elements || [];
+}
+
+/* Step 3: turn raw OSM elements into spot objects */
+function osmElementToSpot(el, cat){
+  const tags = el.tags || {};
+  const name = tags.name || tags['name:en'] || null;
+  if(!name) return null; // skip unnamed POIs
+
+  const lat = el.lat || (el.center && el.center.lat);
+  const lon = el.lon || (el.center && el.center.lon);
+
+  // Build address from OSM addr:* tags
+  const addrParts = [
+    tags['addr:housenumber'] && tags['addr:street']
+      ? `${tags['addr:street']} ${tags['addr:housenumber']}`
+      : tags['addr:street'],
+    tags['addr:city'],
+  ].filter(Boolean);
+  const address = addrParts.join(', ') || null;
+
+  // Opening hours: very rough heuristic
+  let openNow = null;
+  if(tags.opening_hours){
+    // Just flag that info exists — full parsing is a whole library
+    openNow = null; // we'll show "has hours" tag instead
   }
+
+  const osmUri = lat && lon
+    ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`
+    : `https://www.openstreetmap.org/search?query=${encodeURIComponent(name)}`;
+
+  return {
+    id: String(el.type) + String(el.id),
+    name,
+    cat,
+    address,
+    openNow,
+    website: tags.website || tags['contact:website'] || null,
+    phone: tags.phone || tags['contact:phone'] || null,
+    hasHours: !!tags.opening_hours,
+    osmUri,
+  };
 }
 
-async function fetchRealSpots(location, members, weather){
-  lastPlacesError = null;
-  await waitForMaps();
-
+async function fetchOSMSpots(location, members, weather){
+  // Tally preferences
   const tally = {};
   members.forEach(m => m.prefs.forEach(p => { tally[p] = (tally[p]||0)+1; }));
   let prefOrder = Object.keys(tally).sort((a,b)=> tally[b]-tally[a]);
   if(prefOrder.length===0) prefOrder = ['chill'];
 
-  // Search the group's top category first; only spend a second request
-  // on the runner-up category if the first didn't return enough results.
-  let results = await searchCategory(prefOrder[0], location, weather, 5);
-  if(results.length < 5 && prefOrder[1]){
-    const more = await searchCategory(prefOrder[1], location, weather, 5);
-    results = results.concat(more);
-  }
+  let centre;
+  try{ centre = await geocodeCity(location); }
+  catch(e){ console.error('Geocode failed:', e); return []; }
 
-  // dedupe by place id, best-rated first
+  const bias = weather.isOutdoorFriendly ? 'outdoor' : 'indoor';
   const seen = new Set();
-  const deduped = [];
-  for(const r of results){
-    if(seen.has(r.place.id)) continue;
-    seen.add(r.place.id);
-    deduped.push(r);
+  const results = [];
+
+  // Search top 2 prefs
+  for(const pref of prefOrder.slice(0, 2)){
+    const tagDef = OSM_TAGS[pref] || OSM_TAGS.chill;
+    const tags = tagDef[bias];
+    const catLabel = prettyPref(pref);
+    try{
+      const elements = await overpassQuery(centre.lat, centre.lon, tags, 3000, 10);
+      for(const el of elements){
+        const spot = osmElementToSpot(el, catLabel);
+        if(!spot || seen.has(spot.id)) continue;
+        seen.add(spot.id);
+        results.push(spot);
+        if(results.length >= 8) break;
+      }
+    }catch(e){ console.error('Overpass query failed for', pref, e); }
+    if(results.length >= 8) break;
   }
-  deduped.sort((a,b)=> (b.place.rating||0) - (a.place.rating||0));
 
-  return deduped.slice(0,5).map(r=>{
-    const p = r.place;
-    const photo = (p.photos && p.photos[0]) || null;
-    let photoUri = null, photoCredit = null;
-    if(photo){
-      try{
-        photoUri = photo.getURI({ maxWidth: 480, maxHeight: 320 });
-        photoCredit = (photo.authorAttributions && photo.authorAttributions[0])
-          ? photo.authorAttributions[0].displayName : null;
-      }catch(e){ /* photo unavailable — card still works without it */ }
-    }
-    const fallbackMapsSearch = 'https://www.google.com/maps/search/?api=1&query=' +
-      encodeURIComponent((p.displayName||'') + ' ' + (p.formattedAddress||''));
-    return {
-      name: p.displayName || 'Unnamed spot',
-      cat: r.cat,
-      rating: typeof p.rating === 'number' ? p.rating.toFixed(1) : null,
-      userRatingCount: p.userRatingCount || null,
-      address: p.formattedAddress || '',
-      photoUri,
-      photoCredit,
-      priceSymbol: priceLevelToSymbol(p.priceLevel),
-      mapsUri: p.googleMapsURI || fallbackMapsSearch,
-    };
-  });
+  return results.slice(0, 6);
 }
-
 
 /* ---------------- BOOT ---------------- */
 (async function boot(){
