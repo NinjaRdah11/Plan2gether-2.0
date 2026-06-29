@@ -6,36 +6,42 @@
 <title>Plan2Gether — find where to hang out</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
-/* ===== THEME TOKENS (overridden by JS theme picker) ===== */
+/* ===== THEME TOKENS ===== */
 :root{
   --dusk:#1B1F3B; --dusk-2:#262C52; --dusk-3:#323B6E;
   --accent:#F2A65A; --accent-soft:rgba(242,166,90,0.15);
-  --coral:#E8615C;
-  --paper:#F6F1E7; --ink:#1B1F3B;
+  --coral:#E8615C; --paper:#F6F1E7; --ink:#1B1F3B;
   --mist:#9098C0; --good:#7FBE8F;
   --radius:18px; --radius-sm:10px;
   --card-bg:var(--paper); --card-color:var(--ink);
   --input-bg:#fff; --input-border:#e3ddcd;
   --tag-bg:#fff; --tag-color:#41435c;
   --spot-bg:#fff; --spot-border:#e3ddcd;
-  --font-body:'Inter',sans-serif; --font-display:'Fraunces',serif; --font-mono:'JetBrains Mono',monospace;
+  --font-body:'Inter',sans-serif;
+  --font-display:'Fraunces',serif;
+  --font-mono:'JetBrains Mono',monospace;
 }
-/* Dark-card variant */
-body.theme-dark { --card-bg:#1e2240; --card-color:var(--paper); --input-bg:#2a3060; --input-border:#3d4880; --tag-bg:#2a3060; --tag-color:var(--paper); --spot-bg:#232847; --spot-border:#3d4880; }
-body.theme-dark .card { box-shadow:0 14px 40px rgba(0,0,0,0.5); }
-body.theme-dark label { color:#8890b8; }
-body.theme-dark input[type=text],body.theme-dark input[type=number]{ color:var(--paper); }
-body.theme-dark .member-row { border-bottom-color:#3d4880; }
-body.theme-dark .spot .address,body.theme-dark .spot-desc,body.theme-dark .spot p { color:#9098c0; }
-
-/* Accent colour overrides (set via JS) */
-body.accent-purple { --accent:#9B7FEA; --accent-soft:rgba(155,127,234,0.15); }
-body.accent-teal   { --accent:#3ECFB2; --accent-soft:rgba(62,207,178,0.15); }
-body.accent-coral  { --accent:#E8615C; --accent-soft:rgba(232,97,92,0.15); }
-body.accent-amber  { --accent:#F2A65A; --accent-soft:rgba(242,166,90,0.15); }
+body.theme-dark{
+  --card-bg:#1e2240; --card-color:var(--paper);
+  --input-bg:#2a3060; --input-border:#3d4880;
+  --tag-bg:#2a3060; --tag-color:var(--paper);
+  --spot-bg:#232847; --spot-border:#3d4880;
+}
+body.theme-dark .card{ box-shadow:0 14px 40px rgba(0,0,0,0.5); }
+body.theme-dark label{ color:#8890b8; }
+body.theme-dark input[type=text],body.theme-dark input[type=number],body.theme-dark input[type=email],body.theme-dark input[type=password]{ color:var(--paper); }
+body.theme-dark .member-row{ border-bottom-color:#3d4880; }
+body.theme-dark .spot .address,body.theme-dark .spot-desc{ color:#9098c0; }
+body.accent-purple{ --accent:#9B7FEA; --accent-soft:rgba(155,127,234,0.15); }
+body.accent-teal  { --accent:#3ECFB2; --accent-soft:rgba(62,207,178,0.15); }
+body.accent-coral { --accent:#E8615C; --accent-soft:rgba(232,97,92,0.15); }
+body.accent-amber { --accent:#F2A65A; --accent-soft:rgba(242,166,90,0.15); }
 
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
@@ -54,350 +60,367 @@ body{
 .app{ width:100%; max-width:580px; }
 
 /* ---- HEADER ---- */
-.header-row{
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:26px;
-}
+.header-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; }
 .brand{ display:flex; align-items:center; gap:10px; }
-.brand .dot{
-  width:10px; height:10px; border-radius:50%;
-  background:var(--accent); box-shadow:0 0 0 4px var(--accent-soft);
-  flex-shrink:0;
+.brand .dot{ width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);flex-shrink:0; }
+.brand h1{ font-family:var(--font-display);font-weight:600;font-size:1.5rem;margin:0; }
+.brand .tagline{ color:var(--mist);font-size:0.82rem;margin-left:2px; }
+.header-right{ display:flex;gap:8px;align-items:center; }
+.settings-btn,.account-btn{
+  background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.12);
+  border-radius:10px;padding:7px 11px;cursor:pointer;font-size:1rem;
+  color:var(--paper);transition:background .15s;font-family:var(--font-body);
+  white-space:nowrap;
 }
-.brand h1{ font-family:var(--font-display); font-weight:600; font-size:1.5rem; margin:0; }
-.brand .tagline{ color:var(--mist); font-size:0.82rem; margin-left:2px; }
-.settings-btn{
-  background:rgba(255,255,255,0.08); border:1.5px solid rgba(255,255,255,0.12);
-  border-radius:10px; padding:7px 11px; cursor:pointer; font-size:1.1rem;
-  color:var(--paper); transition:background .15s;
-}
-.settings-btn:hover{ background:rgba(255,255,255,0.16); }
+.settings-btn:hover,.account-btn:hover{ background:rgba(255,255,255,0.16); }
 
 /* ---- SETTINGS DRAWER ---- */
 .settings-drawer{
-  background:var(--dusk-2); border:1.5px solid var(--dusk-3);
-  border-radius:16px; padding:20px 20px; margin-bottom:18px;
-  display:none;
+  background:var(--dusk-2);border:1.5px solid var(--dusk-3);
+  border-radius:16px;padding:20px;margin-bottom:18px;display:none;
 }
 .settings-drawer.open{ display:block; }
-.settings-drawer h3{
-  font-family:var(--font-display); font-size:1rem; font-weight:600;
-  margin:0 0 16px; color:var(--paper);
-}
+.settings-drawer h3{ font-family:var(--font-display);font-size:1rem;font-weight:600;margin:0 0 16px;color:var(--paper); }
 .settings-section{ margin-bottom:14px; }
 .settings-section:last-child{ margin-bottom:0; }
-.settings-section label-s{
-  display:block; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.07em;
-  color:var(--mist); font-weight:600; margin-bottom:8px;
-}
-.swatch-row{ display:flex; gap:8px; flex-wrap:wrap; }
-.swatch{
-  width:30px; height:30px; border-radius:50%; cursor:pointer;
-  border:2.5px solid transparent; transition:transform .12s, border-color .12s;
-  position:relative;
-}
+.settings-section label-s{ display:block;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--mist);font-weight:600;margin-bottom:8px; }
+.swatch-row{ display:flex;gap:8px;flex-wrap:wrap; }
+.swatch{ width:30px;height:30px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:transform .12s,border-color .12s; }
 .swatch:hover{ transform:scale(1.12); }
 .swatch.active{ border-color:#fff; }
-.theme-row{ display:flex; gap:8px; }
-.theme-pill{
-  padding:6px 14px; border-radius:999px; font-size:0.8rem; font-weight:600;
-  cursor:pointer; border:1.5px solid var(--dusk-3); color:var(--mist);
-  transition:background .14s, color .14s, border-color .14s;
+.theme-row{ display:flex;gap:8px; }
+.theme-pill{ padding:6px 14px;border-radius:999px;font-size:0.8rem;font-weight:600;cursor:pointer;border:1.5px solid var(--dusk-3);color:var(--mist);transition:background .14s,color .14s,border-color .14s; }
+.theme-pill.active{ background:var(--accent);color:#1b1f3b;border-color:var(--accent); }
+.slider-row{ display:flex;align-items:center;gap:12px; }
+.slider-row input[type=range]{ flex:1;accent-color:var(--accent); }
+.slider-val{ font-family:var(--font-mono);font-size:0.82rem;color:var(--accent);min-width:32px;text-align:right; }
+
+/* ---- TRIAL BANNER ---- */
+.trial-banner{
+  background:linear-gradient(90deg,var(--dusk-2),var(--dusk-3));
+  border:1px solid var(--accent);border-radius:12px;
+  padding:10px 16px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:0.84rem;
 }
-.theme-pill.active{ background:var(--accent); color:#1b1f3b; border-color:var(--accent); }
-.slider-row{ display:flex; align-items:center; gap:12px; }
-.slider-row input[type=range]{ flex:1; accent-color:var(--accent); }
-.slider-val{ font-family:var(--font-mono); font-size:0.82rem; color:var(--accent); min-width:32px; text-align:right; }
+.trial-banner .tb-left{ display:flex;align-items:center;gap:8px; }
+.trial-banner strong{ color:var(--accent); }
+.trial-badge{
+  background:var(--accent);color:#1b1f3b;
+  font-size:0.68rem;font-weight:800;padding:2px 8px;
+  border-radius:999px;text-transform:uppercase;letter-spacing:0.05em;
+}
 
 /* ---- ROUTE ---- */
-.route{ position:relative; padding-left:26px; }
+.route{ position:relative;padding-left:26px; }
 .route::before{
-  content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px;
-  background-image:linear-gradient(var(--mist) 60%, transparent 0%);
-  background-size:2px 10px; background-repeat:repeat-y; opacity:0.28;
+  content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;
+  background-image:linear-gradient(var(--mist) 60%,transparent 0%);
+  background-size:2px 10px;background-repeat:repeat-y;opacity:0.28;
 }
 .pin{
-  position:absolute; left:-2px; width:14px; height:14px;
-  border-radius:50% 50% 50% 0; background:var(--accent); transform:rotate(-45deg); top:8px;
-  box-shadow:0 0 0 3px rgba(27,31,59,1), 0 0 0 5px var(--accent-soft);
+  position:absolute;left:-2px;width:14px;height:14px;
+  border-radius:50% 50% 50% 0;background:var(--accent);transform:rotate(-45deg);top:8px;
+  box-shadow:0 0 0 3px rgba(27,31,59,1),0 0 0 5px var(--accent-soft);
 }
 
 /* ---- CARD ---- */
 .card{
-  background:var(--card-bg); color:var(--card-color);
-  border-radius:var(--radius); padding:26px 24px; margin-bottom:18px;
-  box-shadow:0 12px 34px rgba(0,0,0,0.22);
-  transition:background .3s;
+  background:var(--card-bg);color:var(--card-color);
+  border-radius:var(--radius);padding:26px 24px;margin-bottom:18px;
+  box-shadow:0 12px 34px rgba(0,0,0,0.22);transition:background .3s;
 }
-.card h2{ font-family:var(--font-display); font-size:1.3rem; font-weight:600; margin:0 0 5px; }
-.card p.sub{ margin:0 0 18px; color:#5b5f7a; font-size:0.91rem; line-height:1.5; }
+.card h2{ font-family:var(--font-display);font-size:1.3rem;font-weight:600;margin:0 0 5px; }
+.card p.sub{ margin:0 0 18px;color:#5b5f7a;font-size:0.91rem;line-height:1.5; }
+body.theme-dark .card p.sub{ color:#8890b8; }
 
-/* ---- HOME CHOICES ---- */
-.choices{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.choice-btn{
-  border:2px solid var(--input-border); background:var(--input-bg);
-  border-radius:14px; padding:20px 16px; text-align:left; cursor:pointer;
-  font-family:var(--font-body); transition:border-color .15s, transform .12s, box-shadow .12s;
-  position:relative; overflow:hidden;
+/* ---- ENTRY SCREEN (who are you) ---- */
+.entry-hero{
+  text-align:center;padding:10px 0 24px;
 }
-.choice-btn::after{
-  content:""; position:absolute; inset:0;
-  background:linear-gradient(135deg, var(--accent-soft), transparent);
-  opacity:0; transition:opacity .2s;
+.entry-hero .big-emoji{ font-size:3rem;margin-bottom:10px; }
+.entry-hero h2{ font-family:var(--font-display);font-size:1.6rem;font-weight:600;margin:0 0 8px; }
+.entry-hero p{ color:#5b5f7a;font-size:0.95rem;line-height:1.55;margin:0; }
+body.theme-dark .entry-hero p{ color:#8890b8; }
+.entry-choices{ display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px; }
+.entry-btn{
+  border-radius:14px;padding:20px 16px;text-align:center;cursor:pointer;
+  font-family:var(--font-body);transition:transform .12s,box-shadow .12s;
+  border:none;display:flex;flex-direction:column;align-items:center;gap:6px;
 }
-.choice-btn:hover{ border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,0.12); }
-.choice-btn:hover::after{ opacity:1; }
-.choice-btn .cb-icon{ font-size:1.5rem; margin-bottom:8px; display:block; }
-.choice-btn strong{ display:block; font-family:var(--font-display); font-size:1.05rem; margin-bottom:3px; color:var(--card-color); }
-.choice-btn span{ color:#6b6f8a; font-size:0.82rem; }
+.entry-btn-guest{
+  background:var(--dusk-2);border:1.5px solid var(--dusk-3);color:var(--paper);
+}
+.entry-btn-guest:hover{ transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,0.2); }
+.entry-btn-auth{
+  background:var(--accent);color:#26203d;
+  box-shadow:0 4px 16px var(--accent-soft);
+}
+.entry-btn-auth:hover{ transform:translateY(-2px);filter:brightness(1.06);box-shadow:0 8px 24px var(--accent-soft); }
+.entry-btn .eb-icon{ font-size:1.6rem; }
+.entry-btn strong{ font-family:var(--font-display);font-size:1rem;display:block; }
+.entry-btn span{ font-size:0.78rem;opacity:0.75;line-height:1.3; }
 
-/* ---- FORM ELEMENTS ---- */
-label{
-  display:block; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.07em;
-  color:#7a7e98; font-weight:700; margin:14px 0 6px;
+/* ---- HOME SCREEN (signed-in) ---- */
+.plan-grid{ display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px; }
+.plan-card{
+  border-radius:16px;padding:22px 18px;cursor:pointer;
+  font-family:var(--font-body);
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1),box-shadow .15s;
+  border:none;text-align:left;position:relative;overflow:hidden;
 }
+.plan-card::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.08),transparent);
+}
+.plan-card:hover{ transform:translateY(-3px) scale(1.02);box-shadow:0 14px 32px rgba(0,0,0,0.22); }
+.plan-card-free{
+  background:var(--dusk-2);border:1.5px solid var(--dusk-3);color:var(--paper);
+}
+.plan-card-pro{
+  background:linear-gradient(135deg,var(--accent) 0%,#e08a3a 100%);color:#26203d;
+}
+.plan-card .pc-badge{
+  display:inline-block;font-size:0.66rem;font-weight:800;
+  text-transform:uppercase;letter-spacing:0.06em;
+  padding:3px 9px;border-radius:999px;margin-bottom:10px;
+}
+.plan-card-free .pc-badge{ background:rgba(255,255,255,0.12);color:var(--mist); }
+.plan-card-pro  .pc-badge{ background:rgba(38,32,61,0.18);color:#26203d; }
+.plan-card .pc-icon{ font-size:1.8rem;display:block;margin-bottom:8px; }
+.plan-card strong{ font-family:var(--font-display);font-size:1.1rem;display:block;margin-bottom:4px; }
+.plan-card p{ font-size:0.8rem;margin:0;opacity:0.75;line-height:1.4; }
+.plan-card-pro p{ opacity:0.7; }
+.trial-cta{
+  margin-top:10px;width:100%;border:none;border-radius:10px;
+  padding:11px;font-size:0.85rem;font-weight:700;cursor:pointer;
+  font-family:var(--font-body);
+  background:rgba(38,32,61,0.2);color:#26203d;
+  transition:background .14s;
+}
+.trial-cta:hover{ background:rgba(38,32,61,0.32); }
+
+/* ---- AUTH SCREEN ---- */
+.auth-tabs{ display:flex;gap:0;margin-bottom:20px;border-radius:10px;overflow:hidden;border:1.5px solid var(--input-border); }
+.auth-tab{
+  flex:1;padding:10px;font-size:0.88rem;font-weight:700;cursor:pointer;
+  background:var(--input-bg);color:#7a7e98;border:none;
+  font-family:var(--font-body);transition:background .14s,color .14s;
+}
+.auth-tab.active{ background:var(--accent);color:#26203d; }
+.auth-divider{ text-align:center;color:#9098c0;font-size:0.8rem;margin:14px 0;position:relative; }
+.auth-divider::before,.auth-divider::after{
+  content:"";position:absolute;top:50%;width:42%;height:1px;background:var(--input-border);
+}
+.auth-divider::before{ left:0; }
+.auth-divider::after{ right:0; }
+.switch-link{
+  text-align:center;margin-top:14px;font-size:0.84rem;color:var(--mist);
+}
+.switch-link button{
+  background:none;border:none;color:var(--accent);cursor:pointer;
+  font-size:0.84rem;font-weight:600;font-family:var(--font-body);text-decoration:underline;
+  padding:0;
+}
+.forgot-link{
+  background:none;border:none;color:var(--mist);cursor:pointer;
+  font-size:0.78rem;font-family:var(--font-body);text-decoration:underline;
+  padding:0;margin-top:8px;display:block;text-align:right;
+}
+.forgot-link:hover{ color:var(--accent); }
+
+/* ---- VERIFY SCREEN ---- */
+.verify-box{ text-align:center;padding:8px 0; }
+.verify-box .ve-icon{ font-size:3rem;margin-bottom:12px; }
+.verify-box h3{ font-family:var(--font-display);font-size:1.2rem;margin:0 0 8px; }
+.verify-box p{ color:#5b5f7a;font-size:0.88rem;line-height:1.5;margin:0 0 18px; }
+body.theme-dark .verify-box p{ color:#8890b8; }
+
+/* ---- PAYWALL ---- */
+.paywall-hero{ text-align:center;padding:6px 0 18px; }
+.paywall-hero .pw-icon{ font-size:2.8rem;margin-bottom:10px; }
+.paywall-hero h2{ font-family:var(--font-display);font-size:1.4rem;margin:0 0 6px; }
+.paywall-hero p{ color:#5b5f7a;font-size:0.88rem;margin:0;line-height:1.5; }
+body.theme-dark .paywall-hero p{ color:#8890b8; }
+.price-row{
+  display:flex;align-items:baseline;justify-content:center;gap:6px;
+  margin:18px 0 6px;
+}
+.price-row .amount{ font-family:var(--font-display);font-size:2.6rem;font-weight:700;color:var(--accent); }
+.price-row .period{ color:#7a7e98;font-size:0.9rem; }
+.free-month{
+  text-align:center;font-size:0.82rem;color:#3c8451;
+  background:#e4f3e6;border-radius:8px;padding:6px 12px;
+  margin-bottom:18px;font-weight:600;
+}
+.perks{ margin:0 0 18px;padding:0;list-style:none; }
+.perks li{ padding:6px 0;font-size:0.88rem;color:#52546b;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ece6d6; }
+.perks li:last-child{ border-bottom:none; }
+body.theme-dark .perks li{ color:#8890b8;border-bottom-color:#3d4880; }
+
+/* ---- FORM ---- */
+label{ display:block;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.07em;color:#7a7e98;font-weight:700;margin:14px 0 6px; }
 label:first-of-type{ margin-top:0; }
-input[type=text], input[type=number]{
-  width:100%; padding:12px 14px; border-radius:var(--radius-sm);
-  border:1.5px solid var(--input-border); background:var(--input-bg);
-  font-size:0.97rem; font-family:var(--font-body); color:var(--card-color);
-  transition:border-color .15s, box-shadow .15s;
+input[type=text],input[type=number],input[type=email],input[type=password]{
+  width:100%;padding:12px 14px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--input-border);background:var(--input-bg);
+  font-size:0.97rem;font-family:var(--font-body);color:var(--card-color);
+  transition:border-color .15s,box-shadow .15s;
 }
-input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-.row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+input:focus{ outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft); }
+.row2{ display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+.pw-input-wrap{ position:relative; }
+.pw-toggle{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;font-size:1rem;color:var(--mist);padding:0;
+}
 
 /* ---- AUTOCOMPLETE ---- */
 .autocomplete-wrap{ position:relative; }
 .autocomplete-list{
-  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:50;
-  background:#fff; border:1.5px solid var(--accent); border-radius:var(--radius-sm);
-  box-shadow:0 8px 24px rgba(0,0,0,0.14); overflow:hidden; display:none;
+  position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;
+  background:#fff;border:1.5px solid var(--accent);border-radius:var(--radius-sm);
+  box-shadow:0 8px 24px rgba(0,0,0,0.14);overflow:hidden;display:none;
 }
+body.theme-dark .autocomplete-list{ background:#2a3060;border-color:var(--accent); }
 .autocomplete-list.open{ display:block; }
 .ac-item{
-  padding:11px 14px; cursor:pointer; font-size:0.9rem; color:var(--ink);
-  border-bottom:1px solid #f0ece0; display:flex; align-items:center; gap:10px;
+  padding:11px 14px;cursor:pointer;font-size:0.9rem;color:var(--ink);
+  border-bottom:1px solid #f0ece0;display:flex;align-items:center;gap:10px;
   transition:background .1s;
 }
+body.theme-dark .ac-item{ color:var(--paper);border-bottom-color:#3d4880; }
 .ac-item:last-child{ border-bottom:none; }
-.ac-item:hover, .ac-item.focused{ background:#fff8f0; }
-.ac-item .ac-icon{ font-size:1rem; flex-shrink:0; opacity:0.7; }
-.ac-item .ac-name{ font-weight:600; }
-.ac-item .ac-region{ font-size:0.78rem; color:#8a8ea8; margin-top:1px; }
+.ac-item:hover,.ac-item.focused{ background:#fff8f0; }
+body.theme-dark .ac-item:hover,body.theme-dark .ac-item.focused{ background:#323b6e; }
+.ac-icon{ font-size:1rem;flex-shrink:0;opacity:0.7; }
+.ac-name{ font-weight:600; }
+.ac-region{ font-size:0.78rem;color:#8a8ea8; }
 
 /* ---- PREFERENCE TAGS ---- */
-.tags{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+.tags{ display:flex;flex-wrap:wrap;gap:8px;margin-top:4px; }
 .tag{
-  border:1.5px solid var(--input-border); background:var(--tag-bg);
-  padding:9px 15px; border-radius:999px; font-size:0.84rem;
-  cursor:pointer; color:var(--tag-color); font-weight:500;
-  transition:border-color .14s, background .14s, color .14s, transform .1s;
-  display:inline-flex; align-items:center; gap:6px;
+  border:1.5px solid var(--input-border);background:var(--tag-bg);
+  padding:9px 15px;border-radius:999px;font-size:0.84rem;
+  cursor:pointer;color:var(--tag-color);font-weight:500;
+  transition:border-color .14s,background .14s,color .14s,transform .1s;
+  display:inline-flex;align-items:center;gap:6px;
 }
-.tag:hover{ border-color:var(--accent); transform:translateY(-1px); }
-.tag.active{ background:var(--ink); border-color:var(--ink); color:var(--paper); }
-body.theme-dark .tag.active{ background:var(--accent); border-color:var(--accent); color:#1b1f3b; }
+.tag:hover{ border-color:var(--accent);transform:translateY(-1px); }
+.tag.active{ background:var(--ink);border-color:var(--ink);color:var(--paper); }
+body.theme-dark .tag.active{ background:var(--accent);border-color:var(--accent);color:#1b1f3b; }
 
 /* ---- BUTTONS ---- */
 .btn{
-  width:100%; border:none; border-radius:12px; padding:14px 18px;
-  font-size:0.97rem; font-weight:700; cursor:pointer;
-  font-family:var(--font-body); margin-top:18px;
-  transition:filter .15s, transform .1s, box-shadow .15s;
-  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%;border:none;border-radius:12px;padding:14px 18px;
+  font-size:0.97rem;font-weight:700;cursor:pointer;
+  font-family:var(--font-body);margin-top:18px;
+  transition:filter .15s,transform .1s,box-shadow .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
 }
 .btn:active{ transform:scale(0.98); }
-.btn-primary{ background:var(--accent); color:#26203d; box-shadow:0 4px 14px var(--accent-soft); }
-.btn-primary:hover{ filter:brightness(1.07); box-shadow:0 6px 20px var(--accent-soft); }
-.btn-secondary{ background:var(--dusk); color:var(--paper); }
+.btn-primary{ background:var(--accent);color:#26203d;box-shadow:0 4px 14px var(--accent-soft); }
+.btn-primary:hover{ filter:brightness(1.07);box-shadow:0 6px 20px var(--accent-soft); }
+.btn-secondary{ background:var(--dusk);color:var(--paper); }
 .btn-secondary:hover{ filter:brightness(1.2); }
-.btn:disabled{ opacity:0.4; cursor:not-allowed; filter:none; box-shadow:none; }
+.btn-ghost{ background:transparent;color:var(--mist);border:1.5px solid var(--input-border); }
+.btn-ghost:hover{ border-color:var(--accent);color:var(--accent); }
+.btn:disabled{ opacity:0.4;cursor:not-allowed;filter:none;box-shadow:none; }
 .small-link{
-  background:none; border:none; color:var(--mist); text-decoration:underline;
-  cursor:pointer; font-size:0.83rem; padding:0; margin-top:14px; font-family:var(--font-body);
-  transition:color .15s;
+  background:none;border:none;color:var(--mist);text-decoration:underline;
+  cursor:pointer;font-size:0.83rem;padding:0;margin-top:14px;
+  font-family:var(--font-body);transition:color .15s;
 }
 .small-link:hover{ color:var(--paper); }
 
 /* ---- TICKET ---- */
 .ticket{
-  border:2px dashed var(--dusk-3); border-radius:16px; padding:20px;
-  text-align:center; background:var(--dusk-2); margin-bottom:10px;
-  position:relative; overflow:hidden;
+  border:2px dashed var(--dusk-3);border-radius:16px;padding:20px;
+  text-align:center;background:var(--dusk-2);margin-bottom:10px;
+  position:relative;overflow:hidden;
 }
 .ticket::before{
-  content:""; position:absolute; inset:0;
-  background:radial-gradient(circle at 50% 0%, var(--accent-soft), transparent 65%);
+  content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 0%,var(--accent-soft),transparent 65%);
 }
-.ticket .code{
-  font-family:var(--font-mono); font-size:2.2rem; font-weight:700;
-  letter-spacing:0.14em; color:var(--accent); position:relative;
-}
-.ticket .label{ font-size:0.72rem; color:var(--mist); text-transform:uppercase; letter-spacing:0.1em; position:relative; }
+.ticket .code{ font-family:var(--font-mono);font-size:2.2rem;font-weight:700;letter-spacing:0.14em;color:var(--accent);position:relative; }
+.ticket .label{ font-size:0.72rem;color:var(--mist);text-transform:uppercase;letter-spacing:0.1em;position:relative; }
 .copy-btn{
-  background:none; border:1px solid var(--dusk-3); border-radius:7px;
-  padding:4px 10px; font-size:0.74rem; color:var(--mist); cursor:pointer;
-  margin-top:8px; font-family:var(--font-body); transition:background .14s, color .14s;
-  position:relative;
+  background:none;border:1px solid var(--dusk-3);border-radius:7px;
+  padding:4px 10px;font-size:0.74rem;color:var(--mist);cursor:pointer;
+  margin-top:8px;font-family:var(--font-body);transition:background .14s,color .14s;position:relative;
 }
-.copy-btn:hover{ background:var(--dusk-3); color:var(--paper); }
+.copy-btn:hover{ background:var(--dusk-3);color:var(--paper); }
 
 /* ---- LOBBY ---- */
-.member-row{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:12px 4px; border-bottom:1px solid #ece6d6; gap:10px;
-}
+.member-row{ display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid #ece6d6;gap:10px; }
 .member-row:last-child{ border-bottom:none; }
 .member-avatar{
-  width:34px; height:34px; border-radius:50%; background:var(--accent-soft);
-  border:2px solid var(--accent); display:flex; align-items:center; justify-content:center;
-  font-weight:700; font-size:0.85rem; color:var(--accent); flex-shrink:0;
-  font-family:var(--font-display);
+  width:34px;height:34px;border-radius:50%;background:var(--accent-soft);
+  border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:0.85rem;color:var(--accent);flex-shrink:0;font-family:var(--font-display);
 }
-.member-info{ flex:1; min-width:0; }
-.member-row .who{ font-weight:700; font-size:0.95rem; }
-.member-row .meta{ font-size:0.78rem; color:#7a7e98; margin-top:1px; }
-.badge{
-  font-size:0.7rem; font-weight:700; padding:4px 10px; border-radius:999px;
-  text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;
-}
-.badge.ready{ background:#e4f3e6; color:#3c8451; }
+.member-info{ flex:1;min-width:0; }
+.member-row .who{ font-weight:700;font-size:0.95rem; }
+.member-row .meta{ font-size:0.78rem;color:#7a7e98;margin-top:1px; }
+.badge{ font-size:0.7rem;font-weight:700;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap; }
+.badge.ready{ background:#e4f3e6;color:#3c8451; }
+.pill-count{ display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#26203d;font-size:0.72rem;font-weight:800;font-family:var(--font-mono);padding:2px 7px;border-radius:999px;margin-left:6px; }
 
 /* ---- WEATHER ---- */
-.weather-strip{
-  display:flex; align-items:center; gap:14px; background:var(--dusk-2);
-  border-radius:14px; padding:15px 18px; margin-bottom:18px;
-  border:1px solid var(--dusk-3);
-}
-.weather-strip .emoji{ font-size:2rem; flex-shrink:0; }
-.weather-strip .wtext strong{ display:block; font-family:var(--font-display); font-size:1.05rem; }
-.weather-strip .wtext span{ color:var(--mist); font-size:0.82rem; line-height:1.4; }
-.weather-strip .wtemp{
-  margin-left:auto; font-family:var(--font-mono); font-size:1.3rem;
-  color:var(--accent); font-weight:700;
-}
+.weather-strip{ display:flex;align-items:center;gap:14px;background:var(--dusk-2);border-radius:14px;padding:15px 18px;margin-bottom:18px;border:1px solid var(--dusk-3); }
+.weather-strip .emoji{ font-size:2rem;flex-shrink:0; }
+.weather-strip .wtext strong{ display:block;font-family:var(--font-display);font-size:1.05rem; }
+.weather-strip .wtext span{ color:var(--mist);font-size:0.82rem;line-height:1.4; }
+.weather-strip .wtemp{ margin-left:auto;font-family:var(--font-mono);font-size:1.3rem;color:var(--accent);font-weight:700; }
 
 /* ---- SPOT CARDS ---- */
-.spots-list{ display:flex; flex-direction:column; gap:10px; }
+.spots-list{ display:flex;flex-direction:column;gap:10px; }
 .spot{
-  border:1.5px solid var(--spot-border); border-radius:14px;
-  padding:16px 18px; background:var(--spot-bg);
-  position:relative;
-  transition:border-color .18s, transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease;
+  border:1.5px solid var(--spot-border);border-radius:14px;
+  padding:16px 18px;background:var(--spot-bg);position:relative;
+  transition:border-color .18s,transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease;
   box-shadow:0 2px 8px rgba(0,0,0,0.06);
 }
-.spot:hover{
-  border-color:var(--accent);
-  transform:translateY(-5px) scale(1.012);
-  box-shadow:0 14px 32px rgba(0,0,0,0.13);
-  z-index:2;
-}
-.spot.is-fav{ border-color:var(--accent); background:linear-gradient(135deg, var(--accent-soft) 0%, var(--spot-bg) 60%); }
-.spot-rank{
-  position:absolute; top:14px; right:14px;
-  width:26px; height:26px; border-radius:50%;
-  background:var(--accent-soft); border:1.5px solid var(--accent);
-  font-family:var(--font-mono); font-size:0.7rem; font-weight:700;
-  color:var(--accent); display:flex; align-items:center; justify-content:center;
-}
-.spot-top{ display:flex; align-items:flex-start; gap:10px; }
-.spot-title-block{ flex:1; min-width:0; padding-right:36px; }
-.spot .cat{
-  font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em;
-  color:#a86a2d; font-weight:800; margin-bottom:3px;
-  display:flex; align-items:center; gap:4px;
-}
-.spot h3{ font-family:var(--font-display); margin:0 0 4px; font-size:1.08rem; color:var(--card-color); line-height:1.25; }
-.spot .address{ font-size:0.8rem; color:#7a7e98; margin-top:4px; display:flex; align-items:center; gap:5px; }
-
-/* Description slides in on hover */
-.spot-desc{
-  font-size:0.84rem; color:#52546b; line-height:1.55;
-  max-height:0; overflow:hidden; opacity:0; margin-top:0;
-  transition:max-height .3s ease, opacity .25s ease, margin-top .25s ease;
-}
+.spot:hover{ border-color:var(--accent);transform:translateY(-5px) scale(1.012);box-shadow:0 14px 32px rgba(0,0,0,0.13);z-index:2; }
+.spot.is-fav{ border-color:var(--accent);background:linear-gradient(135deg,var(--accent-soft) 0%,var(--spot-bg) 60%); }
+.spot-rank{ position:absolute;top:14px;right:14px;width:26px;height:26px;border-radius:50%;background:var(--accent-soft);border:1.5px solid var(--accent);font-family:var(--font-mono);font-size:0.7rem;font-weight:700;color:var(--accent);display:flex;align-items:center;justify-content:center; }
+.spot-top{ display:flex;align-items:flex-start;gap:10px; }
+.spot-title-block{ flex:1;min-width:0;padding-right:36px; }
+.spot .cat{ font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:#a86a2d;font-weight:800;margin-bottom:3px;display:flex;align-items:center;gap:4px; }
+.spot h3{ font-family:var(--font-display);margin:0 0 4px;font-size:1.08rem;color:var(--card-color);line-height:1.25; }
+.spot .address{ font-size:0.8rem;color:#7a7e98;margin-top:4px;display:flex;align-items:center;gap:5px; }
+.spot-desc{ font-size:0.84rem;color:#52546b;line-height:1.55;max-height:0;overflow:hidden;opacity:0;margin-top:0;transition:max-height .3s ease,opacity .25s ease,margin-top .25s ease; }
 body.theme-dark .spot-desc{ color:#8890b8; }
-.spot:hover .spot-desc{ max-height:140px; opacity:1; margin-top:10px; }
-
-/* Action row */
-.spot-actions{
-  display:flex; align-items:center; gap:7px; margin-top:12px; flex-wrap:wrap;
-}
-.action-btn{
-  display:inline-flex; align-items:center; gap:5px;
-  border:1.5px solid var(--spot-border); background:var(--spot-bg);
-  border-radius:999px; padding:5px 13px;
-  font-size:0.8rem; font-family:var(--font-body); font-weight:600;
-  cursor:pointer; color:#52546b;
-  transition:border-color .13s, background .13s, color .13s, transform .1s;
-  user-select:none;
-}
+.spot:hover .spot-desc{ max-height:140px;opacity:1;margin-top:10px; }
+.spot-actions{ display:flex;align-items:center;gap:7px;margin-top:12px;flex-wrap:wrap; }
+.action-btn{ display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--spot-border);background:var(--spot-bg);border-radius:999px;padding:5px 13px;font-size:0.8rem;font-family:var(--font-body);font-weight:600;cursor:pointer;color:#52546b;transition:border-color .13s,background .13s,color .13s,transform .1s;user-select:none; }
 .action-btn:hover{ transform:translateY(-1px); }
-.action-btn.liked{ background:#fce8e7; border-color:var(--coral); color:var(--coral); }
-.action-btn.faved{ background:var(--accent-soft); border-color:var(--accent); color:#8a5c1a; }
-.action-btn .like-count{ opacity:0.75; font-size:0.76rem; }
-.osm-link{
-  font-size:0.77rem; color:#9098c0; text-decoration:none;
-  margin-left:auto; padding:5px 6px;
-  display:inline-flex; align-items:center; gap:4px;
-  border-radius:8px; transition:color .13s, background .13s;
-}
-.osm-link:hover{ color:var(--accent); background:var(--accent-soft); }
+.action-btn.liked{ background:#fce8e7;border-color:var(--coral);color:var(--coral); }
+.action-btn.faved{ background:var(--accent-soft);border-color:var(--accent);color:#8a5c1a; }
+.like-count{ opacity:0.75;font-size:0.76rem; }
+.osm-link{ font-size:0.77rem;color:#9098c0;text-decoration:none;margin-left:auto;padding:5px 6px;display:inline-flex;align-items:center;gap:4px;border-radius:8px;transition:color .13s,background .13s; }
+.osm-link:hover{ color:var(--accent);background:var(--accent-soft); }
+.fav-header{ font-family:var(--font-display);font-size:0.88rem;font-weight:700;color:var(--accent);margin:4px 0 10px;display:flex;align-items:center;gap:7px;text-transform:uppercase;letter-spacing:0.05em; }
+.section-divider{ border:none;border-top:1.5px dashed var(--spot-border);margin:16px 0 14px; }
 
-/* Fav header */
-.fav-header{
-  font-family:var(--font-display); font-size:0.88rem; font-weight:700;
-  color:var(--accent); margin:4px 0 10px; display:flex; align-items:center; gap:7px;
-  text-transform:uppercase; letter-spacing:0.05em;
-}
-.section-divider{
-  border:none; border-top:1.5px dashed var(--spot-border); margin:16px 0 14px;
-}
-
-/* ---- LOADING SKELETON ---- */
-.skeleton{
-  background:linear-gradient(90deg, var(--dusk-2) 25%, var(--dusk-3) 50%, var(--dusk-2) 75%);
-  background-size:200% 100%;
-  animation:shimmer 1.4s infinite;
-  border-radius:8px; height:16px; margin-bottom:8px;
-}
-@keyframes shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-.skeleton-card{
-  background:var(--dusk-2); border-radius:var(--radius); padding:24px;
-  margin-bottom:12px; border:1px solid var(--dusk-3);
-}
+/* ---- LOADING ---- */
+.skeleton{ background:linear-gradient(90deg,var(--dusk-2) 25%,var(--dusk-3) 50%,var(--dusk-2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;height:16px;margin-bottom:8px; }
+@keyframes shimmer{ 0%{background-position:200% 0}100%{background-position:-200% 0} }
+.skeleton-card{ background:var(--dusk-2);border-radius:var(--radius);padding:24px;margin-bottom:12px;border:1px solid var(--dusk-3); }
+.progress-bar{ height:3px;border-radius:999px;background:var(--dusk-3);margin-top:14px;overflow:hidden; }
+.progress-fill{ height:100%;border-radius:999px;background:var(--accent);animation:progress-pulse 2s ease-in-out infinite; }
+@keyframes progress-pulse{ 0%,100%{width:20%;margin-left:0}50%{width:60%;margin-left:20%} }
 
 /* ---- MISC ---- */
-.error-msg{
-  color:#b3413c; background:#fbe7e5; border-radius:10px;
-  padding:10px 14px; font-size:0.84rem; margin-top:10px;
-  display:flex; align-items:center; gap:8px;
-}
-.hint{ color:var(--mist); font-size:0.83rem; text-align:center; margin-top:10px; line-height:1.5; }
-.search-again-row{ display:flex; gap:10px; }
-.search-again-row .btn{ flex:1; margin-top:0; }
-
-/* Progress bar for waiting */
-.progress-bar{
-  height:3px; border-radius:999px; background:var(--dusk-3);
-  margin-top:14px; overflow:hidden;
-}
-.progress-fill{
-  height:100%; border-radius:999px; background:var(--accent);
-  animation:progress-pulse 2s ease-in-out infinite;
-}
-@keyframes progress-pulse{ 0%,100%{width:20%;margin-left:0} 50%{width:60%;margin-left:20%} }
-
-/* Pill counter */
-.pill-count{
-  display:inline-flex; align-items:center; justify-content:center;
-  background:var(--accent); color:#26203d;
-  font-size:0.72rem; font-weight:800; font-family:var(--font-mono);
-  padding:2px 7px; border-radius:999px; margin-left:6px;
-}
+.error-msg{ color:#b3413c;background:#fbe7e5;border-radius:10px;padding:10px 14px;font-size:0.84rem;margin-top:10px;display:flex;align-items:center;gap:8px; }
+.success-msg{ color:#3c8451;background:#e4f3e6;border-radius:10px;padding:10px 14px;font-size:0.84rem;margin-top:10px;display:flex;align-items:center;gap:8px; }
+.hint{ color:var(--mist);font-size:0.83rem;text-align:center;margin-top:10px;line-height:1.5; }
+.search-again-row{ display:flex;gap:10px; }
+.search-again-row .btn{ flex:1;margin-top:0; }
 
 @media(max-width:440px){
-  .choices{ grid-template-columns:1fr; }
+  .plan-grid,.entry-choices{ grid-template-columns:1fr; }
   .row2{ grid-template-columns:1fr; }
   .search-again-row{ flex-direction:column; }
   body{ padding:20px 12px 60px; }
@@ -412,13 +435,15 @@ body.theme-dark .spot-desc{ color:#8890b8; }
       <h1>Plan2Gether</h1>
       <span class="tagline">— pick a spot</span>
     </div>
-    <button class="settings-btn" id="settingsToggle" title="Customise">⚙️</button>
+    <div class="header-right">
+      <div id="accountArea"></div>
+      <button class="settings-btn" id="settingsToggle" title="Customise">⚙️</button>
+    </div>
   </div>
 
   <!-- Settings Drawer -->
   <div class="settings-drawer" id="settingsDrawer">
     <h3>✨ Customise</h3>
-
     <div class="settings-section">
       <label-s>Accent colour</label-s>
       <div class="swatch-row" id="accentSwatches">
@@ -428,15 +453,13 @@ body.theme-dark .spot-desc{ color:#8890b8; }
         <div class="swatch"        data-accent="coral"  style="background:#E8615C;" title="Coral"></div>
       </div>
     </div>
-
     <div class="settings-section">
       <label-s>Card theme</label-s>
       <div class="theme-row" id="themeButtons">
-        <button class="theme-pill active" data-theme="">Light cards</button>
-        <button class="theme-pill"        data-theme="dark">Dark cards</button>
+        <button class="theme-pill active" data-theme="">Light</button>
+        <button class="theme-pill"        data-theme="dark">Dark</button>
       </div>
     </div>
-
     <div class="settings-section">
       <label-s>Search radius — <span id="radiusLabel">3 km</span></label-s>
       <div class="slider-row">
@@ -446,7 +469,6 @@ body.theme-dark .spot-desc{ color:#8890b8; }
         <span class="slider-val" id="radiusVal">3</span>
       </div>
     </div>
-
     <div class="settings-section">
       <label-s>Max results — <span id="resultsLabel">6</span></label-s>
       <div class="slider-row">
@@ -458,102 +480,98 @@ body.theme-dark .spot-desc{ color:#8890b8; }
     </div>
   </div>
 
+  <!-- Trial banner (shown when in trial) -->
+  <div id="trialBanner" style="display:none"></div>
+
   <div class="route" id="route"></div>
 </div>
 
 <script>
-/* ===================== FIREBASE ===================== */
+/* ===================== CONFIG — PASTE YOUR VALUES =====================
+   1. Firebase: paste the config from your Firebase project settings
+   2. WORKER_URL: paste the URL of your deployed Cloudflare Worker
+   3. STRIPE_PRICE_ID: your Stripe price ID (e.g. price_xxx)
+   ===================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyBQGD2VvJPvYyOS3mgxJIp-uHOamvENoPQ",
+  apiKey:      "AIzaSyBQGD2VvJPvYyOS3mgxJIp-uHOamvENoPQ",
+  authDomain:  "plan2gether-ccf06.firebaseapp.com",
   databaseURL: "https://plan2gether-ccf06-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "plan2gether-ccf06",
+  projectId:   "plan2gether-ccf06",
 };
-let db = null, firebaseReady = false;
-try{ firebase.initializeApp(firebaseConfig); db=firebase.database(); firebaseReady=true; }
-catch(e){ console.error('Firebase init failed:',e); }
+const WORKER_URL    = "https://YOUR_WORKER.YOUR_SUBDOMAIN.workers.dev"; // ← paste after deploying worker
+const STRIPE_PRICE_ID = "price_XXXXXXXXXXXXXXXXXXXXXXXX"; // ← your Stripe price ID
+
+/* ===================== FIREBASE INIT ===================== */
+let db, auth, fs, firebaseReady = false;
+try{
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db   = firebase.database();
+  fs   = firebase.firestore();
+  firebaseReady = true;
+}catch(e){ console.error('Firebase init failed:',e); }
 
 /* ===================== SETTINGS ===================== */
 const settings = {
-  accent: localStorage.getItem('p2g_accent') || 'amber',
-  theme:  localStorage.getItem('p2g_theme')  || '',
-  radius: parseInt(localStorage.getItem('p2g_radius') || '3'),
-  results:parseInt(localStorage.getItem('p2g_results')|| '6'),
+  accent:  localStorage.getItem('p2g_accent')  || 'amber',
+  theme:   localStorage.getItem('p2g_theme')   || '',
+  radius:  parseInt(localStorage.getItem('p2g_radius')  || '3'),
+  results: parseInt(localStorage.getItem('p2g_results') || '6'),
 };
 function applySettings(){
-  document.body.className = [
+  document.body.className=[
     settings.theme  ? `theme-${settings.theme}` : '',
     `accent-${settings.accent}`,
   ].filter(Boolean).join(' ');
 }
 applySettings();
 
-document.getElementById('settingsToggle').onclick = ()=>{
+document.getElementById('settingsToggle').onclick=()=>
   document.getElementById('settingsDrawer').classList.toggle('open');
-};
 
-/* Accent swatches */
 document.querySelectorAll('#accentSwatches .swatch').forEach(sw=>{
-  if(sw.dataset.accent === settings.accent) sw.classList.add('active');
+  if(sw.dataset.accent===settings.accent) sw.classList.add('active');
   else sw.classList.remove('active');
   sw.onclick=()=>{
-    settings.accent = sw.dataset.accent;
-    localStorage.setItem('p2g_accent', settings.accent);
+    settings.accent=sw.dataset.accent;
+    localStorage.setItem('p2g_accent',settings.accent);
     document.querySelectorAll('#accentSwatches .swatch').forEach(s=>s.classList.remove('active'));
-    sw.classList.add('active');
-    applySettings();
+    sw.classList.add('active'); applySettings();
   };
 });
-
-/* Theme pills */
 document.querySelectorAll('#themeButtons .theme-pill').forEach(btn=>{
-  if(btn.dataset.theme === settings.theme) btn.classList.add('active');
+  if(btn.dataset.theme===settings.theme) btn.classList.add('active');
   else btn.classList.remove('active');
   btn.onclick=()=>{
-    settings.theme = btn.dataset.theme;
-    localStorage.setItem('p2g_theme', settings.theme);
+    settings.theme=btn.dataset.theme;
+    localStorage.setItem('p2g_theme',settings.theme);
     document.querySelectorAll('#themeButtons .theme-pill').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    applySettings();
+    btn.classList.add('active'); applySettings();
   };
 });
-
-/* Sliders */
-const radiusSlider = document.getElementById('radiusSlider');
-const radiusLabel  = document.getElementById('radiusLabel');
-const radiusVal    = document.getElementById('radiusVal');
-radiusSlider.value = settings.radius;
-radiusLabel.textContent = `${settings.radius} km`;
-radiusVal.textContent   = settings.radius;
-radiusSlider.oninput = ()=>{
-  settings.radius = parseInt(radiusSlider.value);
-  radiusLabel.textContent = `${settings.radius} km`;
-  radiusVal.textContent   = settings.radius;
-  localStorage.setItem('p2g_radius', settings.radius);
+const radiusSlider=document.getElementById('radiusSlider');
+radiusSlider.value=settings.radius;
+document.getElementById('radiusLabel').textContent=`${settings.radius} km`;
+document.getElementById('radiusVal').textContent=settings.radius;
+radiusSlider.oninput=()=>{
+  settings.radius=parseInt(radiusSlider.value);
+  document.getElementById('radiusLabel').textContent=`${settings.radius} km`;
+  document.getElementById('radiusVal').textContent=settings.radius;
+  localStorage.setItem('p2g_radius',settings.radius);
+};
+const resultsSlider=document.getElementById('resultsSlider');
+resultsSlider.value=settings.results;
+document.getElementById('resultsLabel').textContent=settings.results;
+document.getElementById('resultsVal').textContent=settings.results;
+resultsSlider.oninput=()=>{
+  settings.results=parseInt(resultsSlider.value);
+  document.getElementById('resultsLabel').textContent=settings.results;
+  document.getElementById('resultsVal').textContent=settings.results;
+  localStorage.setItem('p2g_results',settings.results);
 };
 
-const resultsSlider = document.getElementById('resultsSlider');
-const resultsLabel  = document.getElementById('resultsLabel');
-const resultsVal    = document.getElementById('resultsVal');
-resultsSlider.value = settings.results;
-resultsLabel.textContent = settings.results;
-resultsVal.textContent   = settings.results;
-resultsSlider.oninput = ()=>{
-  settings.results = parseInt(resultsSlider.value);
-  resultsLabel.textContent = settings.results;
-  resultsVal.textContent   = settings.results;
-  localStorage.setItem('p2g_results', settings.results);
-};
-
-/* ===================== DEVICE ===================== */
-function getDeviceId(){
-  let id=localStorage.getItem('p2g_device_id');
-  if(!id){ id='m'+Math.random().toString(36).slice(2,10); localStorage.setItem('p2g_device_id',id); }
-  return id;
-}
-const deviceId = getDeviceId();
-
-/* ===================== FIREBASE HELPERS ===================== */
-const routeEl = document.getElementById('route');
+/* ===================== HELPERS ===================== */
+const routeEl=document.getElementById('route');
 function render(html){
   if(!firebaseReady){
     routeEl.innerHTML=`<div class="pin"></div><div class="card"><h2>Setup needed</h2><p class="sub">Paste your Firebase config into the firebaseConfig object at the top of the script.</p></div>`;
@@ -561,137 +579,426 @@ function render(html){
   }
   routeEl.innerHTML=`<div class="pin"></div>${html}`;
 }
-function genCode(){
-  const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let s=''; for(let i=0;i<5;i++) s+=c[Math.floor(Math.random()*c.length)]; return s;
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function genCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<5;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+function initials(name){ return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?'; }
+
+/* ===================== AUTH STATE ===================== */
+let currentUser = null; // Firebase Auth user
+let userSub     = null; // { status, trialEndsAt, currentPeriodEnd }
+
+async function loadUserSub(uid){
+  try{
+    const doc = await fs.collection('users').doc(uid).get();
+    return doc.exists ? (doc.data().subscription || null) : null;
+  }catch{ return null; }
 }
+
+function isSubActive(sub){
+  if(!sub) return false;
+  if(sub.status==='active') return true;
+  if(sub.status==='trialing' && sub.trialEndsAt && sub.trialEndsAt.toMillis()>Date.now()) return true;
+  return false;
+}
+
+function trialDaysLeft(sub){
+  if(!sub || sub.status!=='trialing' || !sub.trialEndsAt) return null;
+  const ms = sub.trialEndsAt.toMillis() - Date.now();
+  return ms>0 ? Math.ceil(ms/86400000) : 0;
+}
+
+function updateAccountArea(){
+  const el=document.getElementById('accountArea');
+  if(!currentUser){ el.innerHTML=''; return; }
+  const name=currentUser.displayName||currentUser.email.split('@')[0];
+  el.innerHTML=`<button class="account-btn" id="accountBtn">👤 ${escapeHtml(name)}</button>`;
+  document.getElementById('accountBtn').onclick=showAccountMenu;
+}
+
+function showAccountMenu(){
+  const days=trialDaysLeft(userSub);
+  const subLine = userSub
+    ? userSub.status==='trialing'
+      ? `Free trial · ${days} day${days===1?'':'s'} left`
+      : userSub.status==='active'
+        ? 'Pro · Active'
+        : 'No active subscription'
+    : 'No active subscription';
+  render(`
+    <div class="card">
+      <h2>Your account</h2>
+      <p class="sub">${escapeHtml(currentUser.email)}</p>
+      <div style="background:var(--input-bg);border:1.5px solid var(--input-border);border-radius:10px;padding:12px 14px;font-size:0.88rem;margin-bottom:4px;">
+        <strong style="display:block;margin-bottom:2px;">Subscription</strong>
+        <span style="color:#7a7e98;">${escapeHtml(subLine)}</span>
+      </div>
+      <button class="btn btn-ghost" id="manageSubBtn" style="margin-top:12px;">💳 Manage subscription</button>
+      <button class="btn btn-ghost" id="signOutBtn">🚪 Sign out</button>
+      <button class="small-link" id="backFromAccount">← back</button>
+    </div>`);
+  document.getElementById('manageSubBtn').onclick=openCustomerPortal;
+  document.getElementById('signOutBtn').onclick=async()=>{ await auth.signOut(); };
+  document.getElementById('backFromAccount').onclick=()=>screenHome();
+}
+
+async function openCustomerPortal(){
+  const token=await currentUser.getIdToken();
+  const res=await fetch(`${WORKER_URL}/portal`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+  }).then(r=>r.json());
+  if(res.url) window.location.href=res.url;
+}
+
+function showTrialBanner(){
+  const banner=document.getElementById('trialBanner');
+  const days=trialDaysLeft(userSub);
+  if(days===null||!userSub||userSub.status!=='trialing'){ banner.style.display='none'; return; }
+  banner.style.display='flex';
+  banner.innerHTML=`
+    <div class="trial-banner">
+      <div class="tb-left">
+        <span class="trial-badge">Trial</span>
+        <span><strong>${days} day${days===1?'':'s'} left</strong> on your free trial</span>
+      </div>
+      <button class="copy-btn" style="margin:0;" onclick="screenPaywall()">Subscribe →</button>
+    </div>`;
+}
+
+/* ===================== FIREBASE PARTY ===================== */
 async function getParty(code){ try{ const s=await db.ref('parties/'+code).get(); return s.exists()?s.val():null; }catch{ return null; } }
 async function setParty(code,data){ try{ await db.ref('parties/'+code).set(data); }catch{} }
 async function updateParty(code,patch){ try{ await db.ref('parties/'+code).update(patch); }catch{} }
 async function setMember(code,mid,data){ try{ await db.ref('parties/'+code+'/members/'+mid).set(data); }catch{} }
 
 /* ===================== INTERACTIONS ===================== */
-async function toggleLike(code,spotId){
-  const ref=db.ref(`parties/${code}/interactions/likes/${spotId}/${deviceId}`);
-  const snap=await ref.get();
-  if(snap.exists()) await ref.remove(); else await ref.set(true);
-}
-async function toggleFav(code,spotId,spotData){
-  const ref=db.ref(`parties/${code}/interactions/favs/${spotId}`);
-  const snap=await ref.get();
-  if(snap.exists()) await ref.remove(); else await ref.set(spotData);
-}
+const deviceId=(()=>{ let id=localStorage.getItem('p2g_device_id'); if(!id){ id='m'+Math.random().toString(36).slice(2,10); localStorage.setItem('p2g_device_id',id); } return id; })();
+
+async function toggleLike(code,spotId){ const ref=db.ref(`parties/${code}/interactions/likes/${spotId}/${deviceId}`); const s=await ref.get(); if(s.exists()) await ref.remove(); else await ref.set(true); }
+async function toggleFav(code,spotId,spotData){ const ref=db.ref(`parties/${code}/interactions/favs/${spotId}`); const s=await ref.get(); if(s.exists()) await ref.remove(); else await ref.set(spotData); }
 function parseInteractions(snap){
   const raw=snap&&snap.val?snap.val():null;
-  const likeCounts={}, myLikes=new Set(), favs={};
+  const likeCounts={},myLikes=new Set(),favs={};
   if(raw){
-    if(raw.likes) for(const [sid,voters] of Object.entries(raw.likes)){
-      const v=voters||{};
-      likeCounts[sid]=Object.keys(v).length;
-      if(v[deviceId]) myLikes.add(sid);
-    }
-    if(raw.favs) for(const [sid,obj] of Object.entries(raw.favs)) if(obj) favs[sid]=obj;
+    if(raw.likes) for(const [sid,v] of Object.entries(raw.likes)){ const vm=v||{}; likeCounts[sid]=Object.keys(vm).length; if(vm[deviceId]) myLikes.add(sid); }
+    if(raw.favs)  for(const [sid,obj] of Object.entries(raw.favs)) if(obj) favs[sid]=obj;
   }
   return{likeCounts,myLikes,favs};
 }
 let interactionsListener=null;
-function stopInteractionsListener(){
-  if(interactionsListener){ db.ref(`parties/${currentCode}/interactions`).off('value',interactionsListener); interactionsListener=null; }
-}
+function stopInteractionsListener(){ if(interactionsListener){ db.ref(`parties/${currentCode}/interactions`).off('value',interactionsListener); interactionsListener=null; } }
 
-let currentCode = localStorage.getItem('p2g_party_code')||null;
+let currentCode=localStorage.getItem('p2g_party_code')||null;
 let pollTimer=null;
 function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } stopInteractionsListener(); }
 
-/* ===================== NOMINATIM AUTOCOMPLETE ===================== */
-let acDebounce=null;
-let acResults=[];
-let acFocused=-1;
-
-function initAutocomplete(inputId, listId, onSelect){
-  const inp = document.getElementById(inputId);
-  const list= document.getElementById(listId);
+/* ===================== AUTOCOMPLETE ===================== */
+let acDebounce=null, acResults=[], acFocused=-1;
+function initAutocomplete(inputId,listId,onSelect){
+  const inp=document.getElementById(inputId);
+  const list=document.getElementById(listId);
   if(!inp||!list) return;
-
   function closeList(){ list.classList.remove('open'); acFocused=-1; }
-  function openList(){ if(acResults.length) list.classList.add('open'); }
-
-  inp.addEventListener('input', ()=>{
+  inp.addEventListener('input',()=>{
     clearTimeout(acDebounce);
     const q=inp.value.trim();
     if(q.length<2){ closeList(); return; }
-    acDebounce=setTimeout(async ()=>{
+    acDebounce=setTimeout(async()=>{
       try{
-        const r=await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`,
-          {headers:{'User-Agent':'Plan2Gether/1.0','Accept-Language':'en'}}
-        ).then(r=>r.json());
+        const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`,
+          {headers:{'User-Agent':'Plan2Gether/1.0','Accept-Language':'en'}}).then(r=>r.json());
         acResults=r||[];
         if(!acResults.length){ closeList(); return; }
+        const icons={city:'🏙️',town:'🏘️',village:'🌾',suburb:'🏡',park:'🌳',default:'📍'};
         list.innerHTML=acResults.map((p,i)=>{
           const addr=p.address||{};
           const name=p.name||p.display_name.split(',')[0];
-          const region=[addr.city||addr.town||addr.village, addr.state, addr.country].filter(Boolean).slice(0,2).join(', ');
-          const icon = getLocationIcon(p.type||p.class||'');
-          return `<div class="ac-item" data-idx="${i}">
-            <span class="ac-icon">${icon}</span>
-            <div><div class="ac-name">${escapeHtml(name)}</div><div class="ac-region">${escapeHtml(region)}</div></div>
-          </div>`;
+          const region=[addr.city||addr.town||addr.village,addr.state,addr.country].filter(Boolean).slice(0,2).join(', ');
+          const icon=icons[p.type||p.class||'']||icons.default;
+          return `<div class="ac-item" data-idx="${i}"><span class="ac-icon">${icon}</span><div><div class="ac-name">${escapeHtml(name)}</div><div class="ac-region">${escapeHtml(region)}</div></div></div>`;
         }).join('');
         list.querySelectorAll('.ac-item').forEach(item=>{
-          item.addEventListener('mousedown', e=>{ e.preventDefault(); });
-          item.addEventListener('click', ()=>{
-            const idx=parseInt(item.dataset.idx);
-            const chosen=acResults[idx];
-            const name=chosen.name||chosen.display_name.split(',')[0];
-            inp.value=name;
+          item.addEventListener('mousedown',e=>e.preventDefault());
+          item.addEventListener('click',()=>{
+            const chosen=acResults[parseInt(item.dataset.idx)];
+            inp.value=chosen.name||chosen.display_name.split(',')[0];
             closeList();
-            if(onSelect) onSelect(name, chosen);
+            if(onSelect) onSelect(inp.value,chosen);
           });
         });
-        openList();
-      }catch(e){ closeList(); }
-    }, 280);
+        list.classList.add('open');
+      }catch{ closeList(); }
+    },280);
   });
-
-  inp.addEventListener('keydown', e=>{
+  inp.addEventListener('keydown',e=>{
     const items=list.querySelectorAll('.ac-item');
     if(e.key==='ArrowDown'){ e.preventDefault(); acFocused=Math.min(acFocused+1,items.length-1); items.forEach((el,i)=>el.classList.toggle('focused',i===acFocused)); }
     else if(e.key==='ArrowUp'){ e.preventDefault(); acFocused=Math.max(acFocused-1,0); items.forEach((el,i)=>el.classList.toggle('focused',i===acFocused)); }
     else if(e.key==='Enter'&&acFocused>=0){ items[acFocused]&&items[acFocused].click(); }
     else if(e.key==='Escape'){ closeList(); }
   });
-
-  inp.addEventListener('blur', ()=>{ setTimeout(closeList, 150); });
+  inp.addEventListener('blur',()=>setTimeout(closeList,150));
 }
 
-function getLocationIcon(type){
-  const map={city:'🏙️',town:'🏘️',village:'🌾',suburb:'🏡',neighbourhood:'🏡',park:'🌳',museum:'🏛️',restaurant:'🍽️',cafe:'☕',bar:'🍺',default:'📍'};
-  return map[type]||map.default;
+/* ===================== SCREEN: ENTRY ===================== */
+function screenEntry(){
+  stopPoll();
+  render(`
+    <div class="card">
+      <div class="entry-hero">
+        <div class="big-emoji">🗺️</div>
+        <h2>Welcome to Plan2Gether</h2>
+        <p>Find the perfect spot for your group — restaurants, bars, parks, and more. Sign in to create parties, or jump in as a guest to join one.</p>
+      </div>
+      <div class="entry-choices">
+        <button class="entry-btn entry-btn-guest" id="entryGuest">
+          <span class="eb-icon">👤</span>
+          <strong>Continue as guest</strong>
+          <span>Join a party with a code. No account needed.</span>
+        </button>
+        <button class="entry-btn entry-btn-auth" id="entryAuth">
+          <span class="eb-icon">✨</span>
+          <strong>Sign in</strong>
+          <span>Create parties &amp; manage your account.</span>
+        </button>
+      </div>
+    </div>`);
+  document.getElementById('entryGuest').onclick=screenJoinCode;
+  document.getElementById('entryAuth').onclick=()=>screenAuth('login');
 }
 
-/* ===================== SCREEN: HOME ===================== */
+/* ===================== SCREEN: AUTH ===================== */
+function screenAuth(mode='login'){
+  const isLogin=(mode==='login');
+  render(`
+    <div class="card">
+      <h2>${isLogin?'Welcome back':'Create your account'}</h2>
+      <p class="sub">${isLogin?'Sign in to create and manage parties.':'One account gets you unlimited parties for your whole group.'}</p>
+      <div class="auth-tabs">
+        <button class="auth-tab${isLogin?' active':''}" id="tabLogin">Log in</button>
+        <button class="auth-tab${!isLogin?' active':''}" id="tabSignup">Sign up</button>
+      </div>
+      ${!isLogin?`<label>Your name</label><input type="text" id="authName" placeholder="Mariana" autocomplete="name">`:''}
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+      <label>Password</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="authPassword" placeholder="••••••••" autocomplete="${isLogin?'current-password':'new-password'}">
+        <button class="pw-toggle" id="pwToggle" type="button">👁️</button>
+      </div>
+      <button class="forgot-link" id="forgotBtn">Forgot password?</button>
+      <div id="authErr"></div>
+      <button class="btn btn-primary" id="authSubmit">${isLogin?'🔓 Log in':'🚀 Create account'}</button>
+      <div class="switch-link">
+        ${isLogin?'No account?':'Already have one?'}
+        <button id="authSwitch">${isLogin?'Create one →':'Log in →'}</button>
+      </div>
+      <button class="small-link" id="backToEntry">← back</button>
+    </div>`);
+
+  /* toggle password visibility */
+  const pwInput=document.getElementById('authPassword');
+  document.getElementById('pwToggle').onclick=()=>{
+    pwInput.type=pwInput.type==='password'?'text':'password';
+    document.getElementById('pwToggle').textContent=pwInput.type==='password'?'👁️':'🙈';
+  };
+
+  document.getElementById('tabLogin').onclick=()=>screenAuth('login');
+  document.getElementById('tabSignup').onclick=()=>screenAuth('signup');
+  document.getElementById('authSwitch').onclick=()=>screenAuth(isLogin?'signup':'login');
+  document.getElementById('backToEntry').onclick=screenEntry;
+
+  document.getElementById('forgotBtn').onclick=async()=>{
+    const email=document.getElementById('authEmail').value.trim();
+    const err=document.getElementById('authErr');
+    if(!email){ err.innerHTML=`<div class="error-msg">⚠️ Enter your email first.</div>`; return; }
+    try{
+      await auth.sendPasswordResetEmail(email);
+      err.innerHTML=`<div class="success-msg">✅ Reset email sent! Check your inbox.</div>`;
+    }catch(e){ err.innerHTML=`<div class="error-msg">❌ ${escapeHtml(e.message)}</div>`; }
+  };
+
+  document.getElementById('authSubmit').onclick=async()=>{
+    const email=document.getElementById('authEmail').value.trim();
+    const password=document.getElementById('authPassword').value;
+    const err=document.getElementById('authErr');
+    err.innerHTML='';
+    const btn=document.getElementById('authSubmit');
+    btn.disabled=true; btn.textContent='Please wait…';
+    try{
+      if(isLogin){
+        await auth.signInWithEmailAndPassword(email,password);
+        // onAuthStateChanged handles the rest
+      } else {
+        const name=document.getElementById('authName').value.trim();
+        if(!name){ err.innerHTML=`<div class="error-msg">⚠️ Enter your name.</div>`; btn.disabled=false; btn.textContent='🚀 Create account'; return; }
+        const cred=await auth.createUserWithEmailAndPassword(email,password);
+        await cred.user.updateProfile({displayName:name});
+        await cred.user.sendEmailVerification();
+        // Create Firestore user doc
+        await fs.collection('users').doc(cred.user.uid).set({email,displayName:name,createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        screenVerifyEmail();
+      }
+    }catch(e){
+      err.innerHTML=`<div class="error-msg">❌ ${escapeHtml(friendlyAuthError(e.code))}</div>`;
+      btn.disabled=false; btn.textContent=isLogin?'🔓 Log in':'🚀 Create account';
+    }
+  };
+}
+
+function friendlyAuthError(code){
+  const map={
+    'auth/user-not-found':'No account with that email. Want to sign up?',
+    'auth/wrong-password':'Incorrect password.',
+    'auth/email-already-in-use':'That email is already registered. Try logging in.',
+    'auth/weak-password':'Password must be at least 6 characters.',
+    'auth/invalid-email':'That doesn\'t look like a valid email.',
+    'auth/too-many-requests':'Too many attempts. Wait a moment and try again.',
+  };
+  return map[code]||'Something went wrong. Please try again.';
+}
+
+/* ===================== SCREEN: VERIFY EMAIL ===================== */
+function screenVerifyEmail(){
+  render(`
+    <div class="card">
+      <div class="verify-box">
+        <div class="ve-icon">📬</div>
+        <h3>Check your inbox</h3>
+        <p>We sent a verification link to <strong>${escapeHtml(currentUser?.email||'your email')}</strong>. Click it to activate your account, then come back here.</p>
+        <button class="btn btn-primary" id="checkVerified">✅ I've verified — continue</button>
+        <button class="btn btn-ghost" id="resendEmail" style="margin-top:10px;">🔄 Resend email</button>
+        <div id="verifyMsg"></div>
+      </div>
+    </div>`);
+  document.getElementById('checkVerified').onclick=async()=>{
+    await auth.currentUser.reload();
+    if(auth.currentUser.emailVerified){
+      currentUser=auth.currentUser;
+      await afterSignIn();
+    } else {
+      document.getElementById('verifyMsg').innerHTML=`<div class="error-msg">❌ Not verified yet. Check your spam folder too.</div>`;
+    }
+  };
+  document.getElementById('resendEmail').onclick=async()=>{
+    await auth.currentUser.sendEmailVerification();
+    document.getElementById('verifyMsg').innerHTML=`<div class="success-msg">✅ Email resent!</div>`;
+  };
+}
+
+/* ===================== AFTER SIGN-IN ===================== */
+async function afterSignIn(){
+  userSub=await loadUserSub(currentUser.uid);
+  updateAccountArea();
+  showTrialBanner();
+
+  // Check if returning from Stripe checkout
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('checkout')==='success'){
+    window.history.replaceState({},'',window.location.pathname);
+    // Reload sub — webhook may have already fired
+    userSub=await loadUserSub(currentUser.uid);
+    showTrialBanner();
+  }
+
+  if(isSubActive(userSub)){
+    screenHome();
+  } else {
+    screenPaywall();
+  }
+}
+
+/* ===================== SCREEN: PAYWALL ===================== */
+function screenPaywall(){
+  render(`
+    <div class="card">
+      <div class="paywall-hero">
+        <div class="pw-icon">🎉</div>
+        <h2>Plan2Gether Pro</h2>
+        <p>Create unlimited parties, find the perfect hangout spot, and let your whole group react in real-time.</p>
+      </div>
+      <div class="price-row">
+        <span class="amount">€5</span>
+        <span class="period">/ month</span>
+      </div>
+      <div class="free-month">🎁 First month completely free — cancel anytime</div>
+      <ul class="perks">
+        <li>✅ Create unlimited parties</li>
+        <li>✅ Location autocomplete</li>
+        <li>✅ Real-time likes &amp; group pins</li>
+        <li>✅ Weather-aware venue suggestions</li>
+        <li>✅ Custom search radius &amp; themes</li>
+        <li>✅ Cancel anytime, no questions asked</li>
+      </ul>
+      <div id="paywallErr"></div>
+      <button class="btn btn-primary" id="startTrial">🚀 Start free trial</button>
+      <p class="hint">No charge today. €5/month after 30 days.</p>
+      <button class="small-link" id="signOutPaywall">← Sign out</button>
+    </div>`);
+
+  document.getElementById('startTrial').onclick=async()=>{
+    const btn=document.getElementById('startTrial');
+    btn.disabled=true; btn.textContent='Redirecting to Stripe…';
+    try{
+      const token=await currentUser.getIdToken();
+      const res=await fetch(`${WORKER_URL}/create-checkout`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+        body:JSON.stringify({priceId:STRIPE_PRICE_ID,returnUrl:window.location.href+'?checkout=success'}),
+      }).then(r=>r.json());
+      if(res.url) window.location.href=res.url;
+      else throw new Error(res.error||'No checkout URL returned');
+    }catch(e){
+      document.getElementById('paywallErr').innerHTML=`<div class="error-msg">❌ ${escapeHtml(e.message)}</div>`;
+      btn.disabled=false; btn.textContent='🚀 Start free trial';
+    }
+  };
+  document.getElementById('signOutPaywall').onclick=async()=>{ await auth.signOut(); };
+}
+
+/* ===================== SCREEN: HOME (signed in + subscribed) ===================== */
 function screenHome(){
   stopPoll();
   render(`
     <div class="card">
-      <h2>Where are you all hanging out?</h2>
-      <p class="sub">Create a party and get a shareable code, or jump into an existing one.</p>
-      <div class="choices">
-        <button class="choice-btn" id="goCreate">
-          <span class="cb-icon">🎉</span>
-          <strong>Create a party</strong>
-          <span>Get a code to share with friends</span>
-        </button>
-        <button class="choice-btn" id="goJoin">
-          <span class="cb-icon">🔑</span>
-          <strong>Join a party</strong>
-          <span>Enter a code from a friend</span>
-        </button>
+      <h2>Where are you all hanging out? 🗺️</h2>
+      <p class="sub">Create a party and get a shareable code, or join an existing one with a code from a friend.</p>
+      <div class="plan-grid">
+        <div>
+          <button class="plan-card plan-card-free" id="goJoin">
+            <span class="pc-badge">Free</span>
+            <span class="pc-icon">🔑</span>
+            <strong>Join a party</strong>
+            <p>Have a code? Jump straight in — no account needed for guests.</p>
+          </button>
+        </div>
+        <div>
+          <button class="plan-card plan-card-pro" id="goCreate">
+            <span class="pc-badge">Pro</span>
+            <span class="pc-icon">🎉</span>
+            <strong>Create a party</strong>
+            <p>Host a session, set the location, and discover spots together.</p>
+          </button>
+          <button class="trial-cta" id="goTrial">✨ Start free trial →</button>
+        </div>
       </div>
     </div>`);
-  document.getElementById('goCreate').onclick=screenCreate;
+
   document.getElementById('goJoin').onclick=screenJoinCode;
+
+  // Both "Create" and "Start free trial" go to the same place —
+  // if already subscribed, directly to party creation; otherwise paywall.
+  const handleCreate=()=>{
+    if(!currentUser){ screenAuth('login'); return; }
+    if(isSubActive(userSub)) screenCreate();
+    else screenPaywall();
+  };
+  document.getElementById('goCreate').onclick=handleCreate;
+  document.getElementById('goTrial').onclick=()=>{
+    if(!currentUser){ screenAuth('signup'); return; }
+    if(isSubActive(userSub)) screenCreate();
+    else screenPaywall();
+  };
 }
 
 /* ===================== SCREEN: CREATE ===================== */
@@ -699,7 +1006,7 @@ function screenCreate(){
   render(`
     <div class="card">
       <h2>Start a party</h2>
-      <p class="sub">You'll be the host — once everyone joins, you pick the area and kick off the search.</p>
+      <p class="sub">You're the host. Once everyone joins you pick the area and kick off the search.</p>
       <button class="btn btn-primary" id="makeCode">🎲 Generate party code</button>
       <button class="small-link" id="back1">← back</button>
     </div>`);
@@ -727,7 +1034,7 @@ function screenJoinCode(){
       <button class="btn btn-primary" id="checkCode">🚀 Join party</button>
       <button class="small-link" id="back2">← back</button>
     </div>`);
-  document.getElementById('back2').onclick=screenHome;
+  document.getElementById('back2').onclick= currentUser ? screenHome : screenEntry;
   const inp=document.getElementById('codeInput');
   inp.addEventListener('input',()=>{ inp.value=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
   inp.focus();
@@ -738,7 +1045,7 @@ function screenJoinCode(){
     if(code.length<4){ err.innerHTML=`<div class="error-msg">⚠️ Enter the full 5-character code.</div>`; return; }
     const party=await getParty(code);
     if(!party){ err.innerHTML=`<div class="error-msg">❌ No party found. Double-check the code.</div>`; return; }
-    if(party.status==='done'){ err.innerHTML=`<div class="error-msg">🔒 This party already wrapped up. Ask the host to start a new one.</div>`; return; }
+    if(party.status==='done'){ err.innerHTML=`<div class="error-msg">🔒 This party already wrapped up.</div>`; return; }
     currentCode=code;
     localStorage.setItem('p2g_party_code',code);
     localStorage.setItem('p2g_is_leader','0');
@@ -748,18 +1055,17 @@ function screenJoinCode(){
 
 /* ===================== PREFERENCES ===================== */
 const PREF_OPTIONS=[
-  {k:'chill',      label:'Chill / hangout', icon:'🛋️'},
-  {k:'romantic',   label:'Romantic',        icon:'💑'},
-  {k:'games',      label:'Games',           icon:'🎮'},
-  {k:'restaurant', label:'Restaurant',      icon:'🍽️'},
-  {k:'coffee',     label:'Coffee & bites',  icon:'☕'},
-  {k:'nightlife',  label:'Nightlife',       icon:'🍹'},
-  {k:'outdoors',   label:'Outdoors',        icon:'🌿'},
-  {k:'culture',    label:'Culture',         icon:'🏛️'},
+  {k:'chill',label:'Chill / hangout',icon:'🛋️'},
+  {k:'romantic',label:'Romantic',icon:'💑'},
+  {k:'games',label:'Games',icon:'🎮'},
+  {k:'restaurant',label:'Restaurant',icon:'🍽️'},
+  {k:'coffee',label:'Coffee & bites',icon:'☕'},
+  {k:'nightlife',label:'Nightlife',icon:'🍹'},
+  {k:'outdoors',label:'Outdoors',icon:'🌿'},
+  {k:'culture',label:'Culture',icon:'🏛️'},
 ];
 function prettyPref(k){ const f=PREF_OPTIONS.find(p=>p.k===k); return f?f.label:k; }
 function prefIcon(k){ const f=PREF_OPTIONS.find(p=>p.k===k); return f?f.icon:'📍'; }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ===================== SCREEN: PROFILE ===================== */
 function screenProfile(isLeader){
@@ -772,33 +1078,23 @@ function screenProfile(isLeader){
     </div>
     <div class="card">
       <h2>Tell us about you</h2>
-      <p class="sub">Fill in your details. Everyone joins on their own device — your preferences shape the recommendations.</p>
+      <p class="sub">Everyone fills this in on their own device. Your answers shape the venue suggestions.</p>
       <label>Your name</label>
-      <input type="text" id="pName" placeholder="e.g. Mariana" autocomplete="off">
+      <input type="text" id="pName" placeholder="e.g. Mariana" autocomplete="off" value="${currentUser&&currentUser.displayName?escapeHtml(currentUser.displayName):''}">
       <div class="row2">
-        <div>
-          <label>Age</label>
-          <input type="number" id="pAge" min="1" max="120" placeholder="24">
-        </div>
-        <div>
-          <label>Budget (€)</label>
-          <input type="number" id="pBudget" min="0" placeholder="30">
-        </div>
+        <div><label>Age</label><input type="number" id="pAge" min="1" max="120" placeholder="24"></div>
+        <div><label>Budget (€)</label><input type="number" id="pBudget" min="0" placeholder="30"></div>
       </div>
       <label>Vibe? Pick 1–3</label>
       <div class="tags" id="tagWrap">
         ${PREF_OPTIONS.map(p=>`<button type="button" class="tag" data-k="${p.k}">${p.icon} ${p.label}</button>`).join('')}
       </div>
       <div id="profErr"></div>
-      <button class="btn btn-primary" id="submitProfile">
-        ${isLeader?'🎯 Save & go to lobby':'✅ Save & join lobby'}
-      </button>
+      <button class="btn btn-primary" id="submitProfile">${isLeader?'🎯 Save & go to lobby':'✅ Save & join lobby'}</button>
     </div>`);
-
   document.getElementById('copyCode').onclick=()=>{
-    navigator.clipboard.writeText(currentCode).then(()=>{ document.getElementById('copyCode').textContent='✅ Copied!'; setTimeout(()=>{ const b=document.getElementById('copyCode'); if(b) b.textContent='📋 Copy code'; },1800); });
+    navigator.clipboard.writeText(currentCode).then(()=>{ const b=document.getElementById('copyCode'); if(b){b.textContent='✅ Copied!'; setTimeout(()=>{ const b2=document.getElementById('copyCode'); if(b2) b2.textContent='📋 Copy code'; },1800);} });
   };
-
   document.querySelectorAll('#tagWrap .tag').forEach(btn=>{
     btn.onclick=()=>{
       const k=btn.dataset.k;
@@ -806,12 +1102,11 @@ function screenProfile(isLeader){
       else{ if(selected.size>=3) return; selected.add(k); btn.classList.add('active'); }
     };
   });
-
   document.getElementById('submitProfile').onclick=async()=>{
     const name=document.getElementById('pName').value.trim();
-    const age =document.getElementById('pAge').value;
-    const bgt =document.getElementById('pBudget').value;
-    const err =document.getElementById('profErr');
+    const age=document.getElementById('pAge').value;
+    const bgt=document.getElementById('pBudget').value;
+    const err=document.getElementById('profErr');
     err.innerHTML='';
     if(!name||!age||!bgt||selected.size===0){ err.innerHTML=`<div class="error-msg">⚠️ Fill in all fields and pick at least one vibe.</div>`; return; }
     const party=await getParty(currentCode);
@@ -822,8 +1117,6 @@ function screenProfile(isLeader){
 }
 
 /* ===================== SCREEN: LOBBY ===================== */
-function initials(name){ return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
-
 function memberRowsHtml(members){
   if(!members.length) return `<p class="sub" style="margin:0;">No one else has joined yet — share the code!</p>`;
   return members.map(m=>`
@@ -836,22 +1129,20 @@ function memberRowsHtml(members){
       <span class="badge ready">✓ Ready</span>
     </div>`).join('');
 }
-
 function refreshLobbyMembers(isLeader,party){
   const members=Object.values(party.members||{});
   const ct=document.getElementById('memberCountText');
   const rw=document.getElementById('memberRowsWrap');
   if(!ct||!rw) return;
-  ct.innerHTML=`${members.length} joined <span class="pill-count">${members.length}</span>`;
+  ct.innerHTML=`Members <span class="pill-count">${members.length}</span>`;
   rw.innerHTML=memberRowsHtml(members);
   if(isLeader){
     const sb=document.getElementById('searchBtn');
-    const h =document.getElementById('lobbyHint');
+    const h=document.getElementById('lobbyHint');
     if(sb) sb.disabled=members.length===0;
-    if(h)  h.textContent=`${members.length} ${members.length===1?'person has':'people have'} joined. Search whenever you're ready.`;
+    if(h) h.textContent=`${members.length} ${members.length===1?'person has':'people have'} joined. Search whenever you're ready.`;
   }
 }
-
 function screenLobby(isLeader){
   stopPoll();
   renderLobby(isLeader,null);
@@ -863,11 +1154,9 @@ function screenLobby(isLeader){
     refreshLobbyMembers(isLeader,party);
   },2000);
 }
-
 function renderLobby(isLeader,party){
   if(!party){ render(`<div class="card"><h2>Loading…</h2><div class="progress-bar"><div class="progress-fill"></div></div></div>`); return; }
   const members=Object.values(party.members||{});
-
   const leaderControls=isLeader?`
     <label>Where are you hanging out?</label>
     <div class="autocomplete-wrap">
@@ -876,15 +1165,13 @@ function renderLobby(isLeader,party){
     </div>
     <div id="lobbyErr"></div>
     <button class="btn btn-primary" id="searchBtn" ${members.length===0?'disabled':''}>🔍 Find hangout spots</button>
-    <p class="hint" id="lobbyHint">${members.length} ${members.length===1?'person has':'people have'} joined. Search whenever you're ready.</p>
+    <p class="hint" id="lobbyHint">${members.length} ${members.length===1?'person has':'people have'} joined.</p>
   `:`
     <div style="text-align:center;padding:12px 0;">
       <div style="font-size:2rem;margin-bottom:8px;">⏳</div>
       <p class="hint" style="margin:0;">Waiting for the host to pick a location and start the search…</p>
       <div class="progress-bar" style="margin-top:14px;"><div class="progress-fill"></div></div>
-    </div>
-  `;
-
+    </div>`;
   render(`
     <div class="ticket">
       <div class="label">Party code — share this!</div>
@@ -893,25 +1180,20 @@ function renderLobby(isLeader,party){
     </div>
     <div class="card">
       <h2>Lobby</h2>
-      <p class="sub" id="memberCountText">${members.length} joined <span class="pill-count">${members.length}</span></p>
+      <p class="sub" id="memberCountText">Members <span class="pill-count">${members.length}</span></p>
       <div id="memberRowsWrap">${memberRowsHtml(members)}</div>
     </div>
     <div class="card">${leaderControls}</div>
     <button class="small-link" id="leaveBtn">← Leave / start over</button>`);
-
   document.getElementById('copyCode2').onclick=()=>{
-    navigator.clipboard.writeText(currentCode).then(()=>{ const b=document.getElementById('copyCode2'); if(b){b.textContent='✅ Copied!'; setTimeout(()=>{ const b2=document.getElementById('copyCode2'); if(b2) b2.textContent='📋 Copy'; },1800);} });
+    navigator.clipboard.writeText(currentCode).then(()=>{
+      const b=document.getElementById('copyCode2');
+      if(b){b.textContent='✅ Copied!'; setTimeout(()=>{ const b2=document.getElementById('copyCode2'); if(b2) b2.textContent='📋 Copy'; },1800);}
+    });
   };
-
-  document.getElementById('leaveBtn').onclick=()=>{
-    stopPoll();
-    localStorage.removeItem('p2g_party_code');
-    localStorage.removeItem('p2g_is_leader');
-    currentCode=null; screenHome();
-  };
-
+  document.getElementById('leaveBtn').onclick=()=>{ stopPoll(); localStorage.removeItem('p2g_party_code'); localStorage.removeItem('p2g_is_leader'); currentCode=null; currentUser?screenHome():screenEntry(); };
   if(isLeader){
-    initAutocomplete('locInput','locList', null);
+    initAutocomplete('locInput','locList',null);
     document.getElementById('searchBtn').onclick=async()=>{
       const loc=document.getElementById('locInput').value.trim();
       const err=document.getElementById('lobbyErr');
@@ -926,9 +1208,7 @@ function renderLobby(isLeader,party){
 }
 
 /* ===================== SCREEN: RESULTS ===================== */
-let lastSuggestions=[];
-let resultsCtx=null;
-
+let lastSuggestions=[],resultsCtx=null;
 async function screenResults(){
   stopInteractionsListener();
   render(`
@@ -940,74 +1220,56 @@ async function screenResults(){
       <div class="skeleton" style="height:80px;border-radius:12px;margin-bottom:10px;"></div>
       <div class="skeleton" style="height:80px;border-radius:12px;"></div>
     </div>`);
-
   const party=await getParty(currentCode);
-  if(!party){ screenHome(); return; }
+  if(!party){ currentUser?screenHome():screenEntry(); return; }
   const members=Object.values(party.members||{});
-  const [weather,newSpots]=await Promise.all([
-    fetchWeather(party.location),
-    fetchOSMSpots(party.location, members, await fetchWeather(party.location))
-  ]);
-
+  const weather=await fetchWeather(party.location);
+  const newSpots=await fetchOSMSpots(party.location,members,weather);
   if(party.status!=='done') await updateParty(currentCode,{status:'done'});
-
-  resultsCtx={location:party.location, memberCount:members.length, weather};
+  resultsCtx={location:party.location,memberCount:members.length,weather};
   const seen=new Set(); lastSuggestions=[];
   for(const s of newSpots){ if(!seen.has(s.id)){ seen.add(s.id); lastSuggestions.push(s); } }
-
   interactionsListener=db.ref(`parties/${currentCode}/interactions`).on('value',snap=>{
     if(!resultsCtx) return;
-    const {likeCounts,myLikes,favs}=parseInteractions(snap);
+    const{likeCounts,myLikes,favs}=parseInteractions(snap);
     const freshIds=new Set(lastSuggestions.map(s=>s.id));
-    for(const [sid,spotObj] of Object.entries(favs)) if(!freshIds.has(sid)){ lastSuggestions.push(spotObj); freshIds.add(sid); }
+    for(const[sid,spotObj] of Object.entries(favs)) if(!freshIds.has(sid)){ lastSuggestions.push(spotObj); freshIds.add(sid); }
     renderResultsScreen(likeCounts,myLikes,favs);
   });
 }
-
 function renderResultsScreen(likeCounts,myLikes,favs){
   if(!resultsCtx) return;
-  const {location,memberCount,weather}=resultsCtx;
-
-  const favSpots   =lastSuggestions.filter(s=>favs[s.id]);
+  const{location,memberCount,weather}=resultsCtx;
+  const favSpots=lastSuggestions.filter(s=>favs[s.id]);
   const nonFavSpots=lastSuggestions.filter(s=>!favs[s.id]);
-
   const favsSection=favSpots.length?`
     <div class="fav-header">⭐ Pinned by the group</div>
     <div class="spots-list">${favSpots.map((s,i)=>spotCard(s,i+1,likeCounts,myLikes,favs)).join('')}</div>
-    <hr class="section-divider">
-  `:'';
-
+    <hr class="section-divider">`:'' ;
   const freshSection=nonFavSpots.length
-    ? `<div class="spots-list">${nonFavSpots.map((s,i)=>spotCard(s,favSpots.length+i+1,likeCounts,myLikes,favs)).join('')}</div>`
-    : favSpots.length
-      ? `<p class="hint">All spots are pinned above.</p>`
-      : `<p class="sub">No venues found for "<strong>${escapeHtml(location)}</strong>". Try a larger city name or adjust the search radius in ⚙️ settings.</p>`;
-
+    ?`<div class="spots-list">${nonFavSpots.map((s,i)=>spotCard(s,favSpots.length+i+1,likeCounts,myLikes,favs)).join('')}</div>`
+    :favSpots.length?`<p class="hint">All spots are pinned above.</p>`
+    :`<p class="sub">No venues found for "<strong>${escapeHtml(location)}</strong>". Try a larger city or adjust the radius in ⚙️.</p>`;
   render(`
     <div class="card">
       <h2>Spots in ${escapeHtml(location)}</h2>
-      <p class="sub">For ${memberCount} ${memberCount===1?'person':'people'} · Live reactions below 👇</p>
+      <p class="sub">For ${memberCount} ${memberCount===1?'person':'people'} · Likes &amp; pins sync live 👇</p>
       <div class="weather-strip">
         <div class="emoji">${weather.emoji}</div>
-        <div class="wtext">
-          <strong>${weather.label}</strong>
-          <span>${weather.note}</span>
-        </div>
+        <div class="wtext"><strong>${weather.label}</strong><span>${weather.note}</span></div>
         <div class="wtemp">${weather.temp}°C</div>
       </div>
-      ${favsSection}
-      ${freshSection}
-      ${lastSuggestions.length?`<p class="hint" style="margin-top:14px;">📍 Data from OpenStreetMap · Likes &amp; pins sync in real-time</p>`:''}
+      ${favsSection}${freshSection}
+      ${lastSuggestions.length?`<p class="hint" style="margin-top:14px;">📍 OpenStreetMap · Real-time sync via Firebase</p>`:''}
     </div>
     <div class="search-again-row">
       <button class="btn btn-primary" id="reSearch">🔄 Search again</button>
       <button class="btn btn-secondary" id="newParty">🆕 New party</button>
     </div>`);
-
   document.querySelectorAll('.action-btn[data-action]').forEach(btn=>{
     btn.addEventListener('click',async e=>{
       e.stopPropagation();
-      const action=btn.dataset.action, sid=btn.dataset.sid;
+      const action=btn.dataset.action,sid=btn.dataset.sid;
       const spot=lastSuggestions.find(s=>s.id===sid);
       if(!spot) return;
       btn.disabled=true;
@@ -1016,22 +1278,21 @@ function renderResultsScreen(likeCounts,myLikes,favs){
       btn.disabled=false;
     });
   });
-
   document.querySelectorAll('.osm-link').forEach(a=>a.addEventListener('click',e=>e.stopPropagation()));
   document.getElementById('reSearch').onclick=()=>screenResults();
-  document.getElementById('newParty').onclick=()=>{
-    stopInteractionsListener(); resultsCtx=null;
-    localStorage.removeItem('p2g_party_code');
-    localStorage.removeItem('p2g_is_leader');
-    currentCode=null; screenHome();
-  };
+  document.getElementById('newParty').onclick=()=>{ stopInteractionsListener(); resultsCtx=null; localStorage.removeItem('p2g_party_code'); localStorage.removeItem('p2g_is_leader'); currentCode=null; currentUser?screenHome():screenEntry(); };
 }
-
 function spotCard(s,rank,likeCounts,myLikes,favs){
   const likeCount=(likeCounts&&likeCounts[s.id])||0;
   const iLiked=myLikes&&myLikes.has(s.id);
   const faved=favs&&!!favs[s.id];
-  const desc=buildDescription(s);
+  const parts=[];
+  if(s.cat) parts.push(`${s.cat} spot`);
+  if(s.hasHours) parts.push('opening hours on OSM');
+  if(s.website) parts.push('has a website');
+  if(s.phone) parts.push('phone listed');
+  if(s.address) parts.push(s.address);
+  const desc=parts.length?parts.join(' · ')+'.':'View on OpenStreetMap for full details.';
   return `
     <div class="spot${faved?' is-fav':''}" data-id="${escapeHtml(s.id)}">
       <div class="spot-rank">#${rank}</div>
@@ -1055,39 +1316,24 @@ function spotCard(s,rank,likeCounts,myLikes,favs){
     </div>`;
 }
 
-function buildDescription(s){
-  const parts=[];
-  if(s.cat)      parts.push(`${s.cat} spot`);
-  if(s.hasHours) parts.push('opening hours on OSM');
-  if(s.website)  parts.push('has a website');
-  if(s.phone)    parts.push('phone listed');
-  if(s.address)  parts.push(s.address);
-  return parts.length ? parts.join(' · ')+'.' : 'View on OpenStreetMap for full details.';
-}
-
 /* ===================== WEATHER ===================== */
 async function fetchWeather(location){
   try{
     const g=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`).then(r=>r.json());
     if(!g.results||!g.results.length) throw new Error('no geo');
-    const {latitude,longitude}=g.results[0];
+    const{latitude,longitude}=g.results[0];
     const w=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`).then(r=>r.json());
     return interpretWeather(w.current.weather_code,Math.round(w.current.temperature_2m));
-  }catch{
-    return{label:'Mild',temp:18,emoji:'⛅',note:"Couldn't load live weather — assuming pleasant conditions.",isOutdoorFriendly:true};
-  }
+  }catch{ return{label:'Mild',temp:18,emoji:'⛅',note:"Couldn't load weather — assuming pleasant conditions.",isOutdoorFriendly:true}; }
 }
 function interpretWeather(code,temp){
   const rainy=[51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(code);
-  const stormy=[95,96,99].includes(code);
-  const snowy=[71,73,75,77,85,86].includes(code);
-  const cloudy=[1,2,3,45,48].includes(code);
-  const clear=code===0;
+  const stormy=[95,96,99].includes(code),snowy=[71,73,75,77,85,86].includes(code),cloudy=[1,2,3,45,48].includes(code);
   let label,emoji,note,isOutdoorFriendly;
-  if(stormy){label='Stormy';emoji='⛈️';note='Thunderstorms ahead — indoor spots recommended.';isOutdoorFriendly=false;}
+  if(stormy){label='Stormy';emoji='⛈️';note='Thunderstorms — indoor spots recommended.';isOutdoorFriendly=false;}
   else if(rainy){label='Rainy';emoji='🌧️';note='Raining — better to stay inside.';isOutdoorFriendly=false;}
   else if(snowy){label='Snowy';emoji='❄️';note='Snow around — cozy indoor spots.';isOutdoorFriendly=false;}
-  else if(clear&&temp>=14){label='Clear';emoji='☀️';note='Beautiful out — outdoor spots are a great pick.';isOutdoorFriendly=true;}
+  else if(code===0&&temp>=14){label='Clear';emoji='☀️';note='Beautiful out — great for outdoor spots.';isOutdoorFriendly=true;}
   else if(cloudy){label='Cloudy';emoji='⛅';note='Overcast but dry — outdoor is fine.';isOutdoorFriendly=true;}
   else{label='Cool';emoji='🌥️';note='A bit chilly — bundle up if heading outside.';isOutdoorFriendly=temp>=10;}
   return{label,emoji,note,temp,code,isOutdoorFriendly};
@@ -1095,104 +1341,105 @@ function interpretWeather(code,temp){
 
 /* ===================== OSM VENUE LOOKUP ===================== */
 const OSM_TAGS={
-  chill:      {outdoor:[['leisure','park'],['amenity','biergarten']],         indoor:[['amenity','bar'],['amenity','pub']]},
-  romantic:   {outdoor:[['tourism','viewpoint'],['leisure','park']],          indoor:[['amenity','restaurant']]},
-  games:      {outdoor:[['leisure','mini_golf'],['leisure','sports_centre']], indoor:[['amenity','arcade'],['leisure','escape_game']]},
-  restaurant: {outdoor:[['amenity','restaurant']],                            indoor:[['amenity','restaurant']]},
-  coffee:     {outdoor:[['amenity','cafe']],                                  indoor:[['amenity','cafe']]},
-  nightlife:  {outdoor:[['amenity','bar'],['amenity','pub']],                 indoor:[['amenity','nightclub'],['amenity','bar']]},
-  outdoors:   {outdoor:[['leisure','park'],['leisure','nature_reserve']],     indoor:[['leisure','sports_centre']]},
-  culture:    {outdoor:[['tourism','monument']],                              indoor:[['tourism','museum'],['tourism','gallery']]},
+  chill:     {outdoor:[['leisure','park'],['amenity','biergarten']],        indoor:[['amenity','bar'],['amenity','pub']]},
+  romantic:  {outdoor:[['tourism','viewpoint'],['leisure','park']],         indoor:[['amenity','restaurant']]},
+  games:     {outdoor:[['leisure','mini_golf'],['leisure','sports_centre']],indoor:[['amenity','arcade'],['leisure','escape_game']]},
+  restaurant:{outdoor:[['amenity','restaurant']],                           indoor:[['amenity','restaurant']]},
+  coffee:    {outdoor:[['amenity','cafe']],                                 indoor:[['amenity','cafe']]},
+  nightlife: {outdoor:[['amenity','bar'],['amenity','pub']],                indoor:[['amenity','nightclub'],['amenity','bar']]},
+  outdoors:  {outdoor:[['leisure','park'],['leisure','nature_reserve']],    indoor:[['leisure','sports_centre']]},
+  culture:   {outdoor:[['tourism','monument']],                             indoor:[['tourism','museum'],['tourism','gallery']]},
 };
 const UA='Plan2Gether/1.0 (group hangout planner)';
-
-async function geocodeCity(location){
-  const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
-    {headers:{'User-Agent':UA,'Accept-Language':'en'}}).then(r=>r.json());
-  if(!r||!r.length) throw new Error('City not found');
-  return{lat:parseFloat(r[0].lat),lon:parseFloat(r[0].lon)};
-}
-
+async function geocodeCity(loc){ const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`,{headers:{'User-Agent':UA,'Accept-Language':'en'}}).then(r=>r.json()); if(!r||!r.length) throw new Error('Not found'); return{lat:parseFloat(r[0].lat),lon:parseFloat(r[0].lon)}; }
 async function overpassQuery(lat,lon,tagPairs,radius,limit){
-  const conds=tagPairs.map(([k,v])=>{
-    const f=v==='*'?`["${k}"]`:`["${k}"="${v}"]`;
-    return `node${f}(around:${radius},${lat},${lon});\nway${f}(around:${radius},${lat},${lon});`;
-  }).join('\n');
+  const conds=tagPairs.map(([k,v])=>{ const f=v==='*'?`["${k}"]`:`["${k}"="${v}"]`; return `node${f}(around:${radius},${lat},${lon});\nway${f}(around:${radius},${lat},${lon});`; }).join('\n');
   const q=`[out:json][timeout:15];(\n${conds}\n);out center ${limit} qt;`;
-  const r=await fetch('https://overpass-api.de/api/interpreter',{
-    method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':UA},
-    body:'data='+encodeURIComponent(q)
-  }).then(r=>r.json());
+  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':UA},body:'data='+encodeURIComponent(q)}).then(r=>r.json());
   return r.elements||[];
 }
-
 function osmElementToSpot(el,cat,prefKey){
   const tags=el.tags||{};
-  const name=tags.name||tags['name:en']||null;
-  if(!name) return null;
-  const lat=el.lat||(el.center&&el.center.lat);
-  const lon=el.lon||(el.center&&el.center.lon);
-  const addr=[
-    tags['addr:street']&&tags['addr:housenumber']
-      ?`${tags['addr:street']} ${tags['addr:housenumber']}`
-      :tags['addr:street'],
-    tags['addr:city']
-  ].filter(Boolean).join(', ')||null;
-  const osmUri=lat&&lon
-    ?`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`
-    :`https://www.openstreetmap.org/search?query=${encodeURIComponent(name)}`;
-  return{
-    id:String(el.type)+String(el.id),name,cat,prefKey,address:addr,
-    website:tags.website||tags['contact:website']||null,
-    phone:tags.phone||tags['contact:phone']||null,
-    hasHours:!!tags.opening_hours,osmUri
-  };
+  const name=tags.name||tags['name:en']||null; if(!name) return null;
+  const lat=el.lat||(el.center&&el.center.lat),lon=el.lon||(el.center&&el.center.lon);
+  const addr=[tags['addr:street']&&tags['addr:housenumber']?`${tags['addr:street']} ${tags['addr:housenumber']}`:tags['addr:street'],tags['addr:city']].filter(Boolean).join(', ')||null;
+  const osmUri=lat&&lon?`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`:`https://www.openstreetmap.org/search?query=${encodeURIComponent(name)}`;
+  return{id:String(el.type)+String(el.id),name,cat,prefKey,address:addr,website:tags.website||tags['contact:website']||null,phone:tags.phone||tags['contact:phone']||null,hasHours:!!tags.opening_hours,osmUri};
 }
-
 async function fetchOSMSpots(location,members,weather){
   const tally={};
   members.forEach(m=>m.prefs.forEach(p=>{tally[p]=(tally[p]||0)+1;}));
   let prefs=Object.keys(tally).sort((a,b)=>tally[b]-tally[a]);
   if(!prefs.length) prefs=['chill'];
-
-  let centre;
-  try{ centre=await geocodeCity(location); }catch{ return []; }
-
+  let centre; try{ centre=await geocodeCity(location); }catch{ return[]; }
   const bias=weather.isOutdoorFriendly?'outdoor':'indoor';
-  const seen=new Set(), results=[];
-  const radiusM=settings.radius*1000;
-  const maxResults=settings.results;
-
+  const seen=new Set(),results=[],radiusM=settings.radius*1000,maxResults=settings.results;
   for(const pref of prefs.slice(0,3)){
     if(results.length>=maxResults) break;
     const tagDef=OSM_TAGS[pref]||OSM_TAGS.chill;
     try{
       const els=await overpassQuery(centre.lat,centre.lon,tagDef[bias],radiusM,maxResults*2);
-      for(const el of els){
-        const spot=osmElementToSpot(el,prettyPref(pref),pref);
-        if(!spot||seen.has(spot.id)) continue;
-        seen.add(spot.id); results.push(spot);
-        if(results.length>=maxResults) break;
-      }
+      for(const el of els){ const spot=osmElementToSpot(el,prettyPref(pref),pref); if(!spot||seen.has(spot.id)) continue; seen.add(spot.id); results.push(spot); if(results.length>=maxResults) break; }
     }catch(e){ console.error('Overpass failed for',pref,e); }
   }
   return results.slice(0,maxResults);
 }
 
-/* ===================== BOOT ===================== */
+/* ===================== BOOT — AUTH STATE LISTENER ===================== */
 (async function boot(){
   if(!firebaseReady){ render(''); return; }
-  if(currentCode){
-    const isLeader=localStorage.getItem('p2g_is_leader')==='1';
-    const party=await getParty(currentCode);
-    if(party&&party.members&&party.members[deviceId]){
-      if(party.status==='searching'||party.status==='done') screenResults();
-      else screenLobby(isLeader);
-      return;
+
+  // Restore in-progress party session first, before auth resolves,
+  // so guests coming back mid-party aren't forced to the entry screen.
+  const savedCode=localStorage.getItem('p2g_party_code');
+  const savedLeader=localStorage.getItem('p2g_is_leader')==='1';
+
+  auth.onAuthStateChanged(async user=>{
+    currentUser=user;
+    updateAccountArea();
+
+    if(user){
+      if(!user.emailVerified){ screenVerifyEmail(); return; }
+      userSub=await loadUserSub(user.uid);
+      showTrialBanner();
+
+      // Handle Stripe checkout return
+      const params=new URLSearchParams(window.location.search);
+      if(params.get('checkout')==='success'){
+        window.history.replaceState({},'',window.location.pathname);
+        userSub=await loadUserSub(user.uid);
+        showTrialBanner();
+      }
+
+      // If they had a party in progress, resume it
+      if(savedCode){
+        currentCode=savedCode;
+        const party=await getParty(savedCode);
+        if(party&&party.members&&party.members[deviceId]){
+          if(party.status==='searching'||party.status==='done') screenResults();
+          else screenLobby(savedLeader);
+          return;
+        }
+      }
+
+      if(isSubActive(userSub)) screenHome();
+      else screenPaywall();
+    } else {
+      // Not signed in — guest path
+      userSub=null;
+      document.getElementById('trialBanner').style.display='none';
+      if(savedCode){
+        currentCode=savedCode;
+        const party=await getParty(savedCode);
+        if(party&&party.members&&party.members[deviceId]){
+          if(party.status==='searching'||party.status==='done') screenResults();
+          else screenLobby(false);
+          return;
+        }
+      }
+      screenEntry();
     }
-  }
-  screenHome();
+  });
 })();
 </script>
 </body>
