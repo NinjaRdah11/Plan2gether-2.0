@@ -6,10 +6,8 @@
 <title>Plan2Gether — find where to hang out</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<!-- Firebase (free, no backend code to write) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<!-- No Google Maps needed — we use Nominatim + Overpass API (both free, no key required) -->
 <style>
   :root{
     --dusk:#1B1F3B;
@@ -37,213 +35,100 @@
     justify-content:center;
     padding:32px 16px 60px;
   }
-  .app{
-    width:100%;
-    max-width:560px;
-  }
-  .brand{
-    display:flex;
-    align-items:baseline;
-    gap:10px;
-    margin-bottom:28px;
-  }
-  .brand .dot{
-    width:10px;height:10px;border-radius:50%;
-    background:var(--amber);
-    box-shadow:0 0 0 4px rgba(242,166,90,0.18);
-  }
-  .brand h1{
-    font-family:'Fraunces',serif;
-    font-weight:600;
-    font-size:1.5rem;
-    margin:0;
-    letter-spacing:0.2px;
-  }
-  .brand span{color:var(--mist);font-size:0.85rem;}
-
-  .route{
-    position:relative;
-    padding-left:26px;
-  }
+  .app{ width:100%; max-width:560px; }
+  .brand{ display:flex; align-items:baseline; gap:10px; margin-bottom:28px; }
+  .brand .dot{ width:10px;height:10px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 4px rgba(242,166,90,0.18); }
+  .brand h1{ font-family:'Fraunces',serif;font-weight:600;font-size:1.5rem;margin:0;letter-spacing:0.2px; }
+  .brand span{ color:var(--mist);font-size:0.85rem; }
+  .route{ position:relative; padding-left:26px; }
   .route::before{
-    content:"";
-    position:absolute;
-    left:5px; top:6px; bottom:6px;
-    width:2px;
+    content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;
     background-image:linear-gradient(var(--mist) 60%, transparent 0%);
-    background-size:2px 10px;
-    background-repeat:repeat-y;
-    opacity:0.35;
+    background-size:2px 10px;background-repeat:repeat-y;opacity:0.35;
   }
   .pin{
-    position:absolute;
-    left:-2px;
-    width:14px;height:14px;
-    border-radius:50% 50% 50% 0;
-    background:var(--amber);
-    transform:rotate(-45deg);
-    top:8px;
+    position:absolute;left:-2px;width:14px;height:14px;border-radius:50% 50% 50% 0;
+    background:var(--amber);transform:rotate(-45deg);top:8px;
     box-shadow:0 0 0 3px rgba(27,31,59,1), 0 0 0 4px rgba(242,166,90,0.35);
   }
-
   .card{
-    background:var(--paper);
-    color:var(--ink);
-    border-radius:var(--radius);
-    padding:26px 24px;
-    margin-bottom:18px;
-    box-shadow:0 14px 32px rgba(0,0,0,0.28);
+    background:var(--paper);color:var(--ink);border-radius:var(--radius);
+    padding:26px 24px;margin-bottom:18px;box-shadow:0 14px 32px rgba(0,0,0,0.28);
   }
-  .card h2{
-    font-family:'Fraunces',serif;
-    font-size:1.3rem;
-    font-weight:600;
-    margin:0 0 4px;
-  }
-  .card p.sub{
-    margin:0 0 18px;
-    color:#5b5f7a;
-    font-size:0.92rem;
-  }
-  .choices{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px;
-  }
+  .card h2{ font-family:'Fraunces',serif;font-size:1.3rem;font-weight:600;margin:0 0 4px; }
+  .card p.sub{ margin:0 0 18px;color:#5b5f7a;font-size:0.92rem; }
+  .choices{ display:grid;grid-template-columns:1fr 1fr;gap:12px; }
   .choice-btn{
-    border:2px solid #e3ddcd;
-    background:#fff;
-    border-radius:14px;
-    padding:18px 14px;
-    text-align:left;
-    cursor:pointer;
-    font-family:'Inter',sans-serif;
-    transition:border-color .15s, transform .1s;
+    border:2px solid #e3ddcd;background:#fff;border-radius:14px;padding:18px 14px;
+    text-align:left;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color .15s, transform .1s;
   }
-  .choice-btn:hover{border-color:var(--amber); transform:translateY(-1px);}
-  .choice-btn strong{display:block; font-family:'Fraunces',serif; font-size:1.05rem; margin-bottom:3px;}
-  .choice-btn span{color:#6b6f8a; font-size:0.83rem;}
-
+  .choice-btn:hover{ border-color:var(--amber);transform:translateY(-1px); }
+  .choice-btn strong{ display:block;font-family:'Fraunces',serif;font-size:1.05rem;margin-bottom:3px; }
+  .choice-btn span{ color:#6b6f8a;font-size:0.83rem; }
   label{
-    display:block;
-    font-size:0.78rem;
-    text-transform:uppercase;
-    letter-spacing:0.06em;
-    color:#7a7e98;
-    font-weight:600;
-    margin:14px 0 6px;
+    display:block;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;
+    color:#7a7e98;font-weight:600;margin:14px 0 6px;
   }
-  label:first-of-type{margin-top:0;}
+  label:first-of-type{ margin-top:0; }
   input[type=text], input[type=number], select{
-    width:100%;
-    padding:12px 13px;
-    border-radius:10px;
-    border:1.5px solid #e3ddcd;
-    background:#fff;
-    font-size:0.98rem;
-    font-family:'Inter',sans-serif;
-    color:var(--ink);
+    width:100%;padding:12px 13px;border-radius:10px;border:1.5px solid #e3ddcd;
+    background:#fff;font-size:0.98rem;font-family:'Inter',sans-serif;color:var(--ink);
   }
   input:focus, select:focus, .choice-btn:focus-visible, .tag:focus-visible, button:focus-visible{
-    outline:3px solid #cdb9ff44;
-    outline-offset:1px;
-    border-color:var(--amber);
+    outline:3px solid #cdb9ff44;outline-offset:1px;border-color:var(--amber);
   }
-  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-
-  .tags{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;}
+  .row2{ display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+  .tags{ display:flex;flex-wrap:wrap;gap:8px;margin-top:4px; }
   .tag{
-    border:1.5px solid #e3ddcd;
-    background:#fff;
-    padding:9px 14px;
-    border-radius:999px;
-    font-size:0.86rem;
-    cursor:pointer;
-    color:#41435c;
-    font-weight:500;
+    border:1.5px solid #e3ddcd;background:#fff;padding:9px 14px;border-radius:999px;
+    font-size:0.86rem;cursor:pointer;color:#41435c;font-weight:500;
   }
-  .tag.active{
-    background:var(--ink);
-    border-color:var(--ink);
-    color:var(--paper);
-  }
-
+  .tag.active{ background:var(--ink);border-color:var(--ink);color:var(--paper); }
   .btn{
-    width:100%;
-    border:none;
-    border-radius:12px;
-    padding:14px 16px;
-    font-size:0.98rem;
-    font-weight:700;
-    cursor:pointer;
-    font-family:'Inter',sans-serif;
-    margin-top:18px;
+    width:100%;border:none;border-radius:12px;padding:14px 16px;font-size:0.98rem;
+    font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;margin-top:18px;
     transition:filter .15s, transform .1s;
   }
-  .btn:active{transform:scale(0.98);}
-  .btn-primary{background:var(--amber); color:#26203d;}
-  .btn-primary:hover{filter:brightness(1.06);}
-  .btn-ghost{background:transparent; color:#6b6f8a; border:1.5px solid #e3ddcd;}
-  .btn-secondary{background:var(--dusk); color:var(--paper);}
-  .btn:disabled{opacity:0.45; cursor:not-allowed;}
-
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--amber);color:#26203d; }
+  .btn-primary:hover{ filter:brightness(1.06); }
+  .btn-ghost{ background:transparent;color:#6b6f8a;border:1.5px solid #e3ddcd; }
+  .btn-secondary{ background:var(--dusk);color:var(--paper); }
+  .btn:disabled{ opacity:0.45;cursor:not-allowed; }
   .ticket{
-    border:2px dashed var(--dusk-3);
-    border-radius:14px;
-    padding:18px;
-    text-align:center;
-    background:var(--dusk-2);
-    margin-bottom:8px;
+    border:2px dashed var(--dusk-3);border-radius:14px;padding:18px;
+    text-align:center;background:var(--dusk-2);margin-bottom:8px;
   }
   .ticket .code{
-    font-family:'JetBrains Mono', monospace;
-    font-size:2.1rem;
-    font-weight:700;
-    letter-spacing:0.12em;
-    color:var(--amber);
+    font-family:'JetBrains Mono', monospace;font-size:2.1rem;font-weight:700;
+    letter-spacing:0.12em;color:var(--amber);
   }
-  .ticket .label{font-size:0.78rem; color:var(--mist); text-transform:uppercase; letter-spacing:0.08em;}
-
+  .ticket .label{ font-size:0.78rem;color:var(--mist);text-transform:uppercase;letter-spacing:0.08em; }
   .member-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:11px 4px;
-    border-bottom:1px solid #ece6d6;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:11px 4px;border-bottom:1px solid #ece6d6;
   }
-  .member-row:last-child{border-bottom:none;}
-  .member-row .who{font-weight:600;}
-  .member-row .meta{font-size:0.8rem; color:#7a7e98;}
+  .member-row:last-child{ border-bottom:none; }
+  .member-row .who{ font-weight:600; }
+  .member-row .meta{ font-size:0.8rem;color:#7a7e98; }
   .badge{
-    font-size:0.72rem;
-    font-weight:700;
-    padding:3px 9px;
-    border-radius:999px;
-    text-transform:uppercase;
-    letter-spacing:0.04em;
+    font-size:0.72rem;font-weight:700;padding:3px 9px;border-radius:999px;
+    text-transform:uppercase;letter-spacing:0.04em;
   }
-  .badge.ready{background:#e4f3e6; color:#3c8451;}
-  .badge.waiting{background:#fbeee0; color:#a86a2d;}
-
+  .badge.ready{ background:#e4f3e6;color:#3c8451; }
   .small-link{
-    background:none;border:none;color:var(--mist);
-    text-decoration:underline; cursor:pointer; font-size:0.85rem;
-    padding:0; margin-top:14px;
+    background:none;border:none;color:var(--mist);text-decoration:underline;
+    cursor:pointer;font-size:0.85rem;padding:0;margin-top:14px;
   }
-
   .weather-strip{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    background:var(--dusk-2);
-    border-radius:14px;
-    padding:14px 16px;
-    margin-bottom:16px;
+    display:flex;align-items:center;gap:12px;background:var(--dusk-2);
+    border-radius:14px;padding:14px 16px;margin-bottom:16px;
   }
-  .weather-strip .emoji{font-size:1.8rem;}
-  .weather-strip .wtext strong{display:block; font-family:'Fraunces',serif; font-size:1.05rem;}
-  .weather-strip .wtext span{color:var(--mist); font-size:0.82rem;}
+  .weather-strip .emoji{ font-size:1.8rem; }
+  .weather-strip .wtext strong{ display:block;font-family:'Fraunces',serif;font-size:1.05rem; }
+  .weather-strip .wtext span{ color:var(--mist);font-size:0.82rem; }
 
+  /* ---- SPOT CARDS ---- */
   .spot{
     border:1.5px solid #e3ddcd;
     border-radius:14px;
@@ -251,53 +136,79 @@
     margin-bottom:12px;
     background:#fff;
     cursor:pointer;
-    transition:border-color .15s;
+    position:relative;
+    /* lift on hover */
+    transition: border-color .18s, transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   }
-  .spot:hover{border-color:var(--amber);}
-  .spot-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
-  .spot h3{font-family:'Fraunces',serif; margin:0 0 4px; font-size:1.08rem;}
+  .spot:hover{
+    border-color:var(--amber);
+    transform: translateY(-5px) scale(1.012);
+    box-shadow: 0 12px 28px rgba(27,31,59,0.14), 0 2px 6px rgba(0,0,0,0.06);
+    z-index:2;
+  }
+  .spot.is-fav{
+    border-color: #f2a65a;
+    background: #fffbf4;
+  }
+  .spot-top{ display:flex;justify-content:space-between;align-items:flex-start;gap:10px; }
+  .spot-title-block{ flex:1;min-width:0; }
+  .spot h3{ font-family:'Fraunces',serif;margin:0 0 3px;font-size:1.08rem; }
   .spot .cat{
-    font-size:0.7rem; text-transform:uppercase; letter-spacing:0.06em;
-    color:#a86a2d; font-weight:700;
+    font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:#a86a2d;font-weight:700;
   }
-  .spot p{margin:8px 0 0; font-size:0.88rem; color:#52546b; line-height:1.45;}
-  .spot .fit{
-    font-family:'JetBrains Mono', monospace;
-    font-size:0.78rem;
-    color:#3c8451;
-    background:#e4f3e6;
-    padding:3px 9px;
-    border-radius:7px;
-    white-space:nowrap;
+  .spot .address{ font-size:0.83rem;color:#52546b;margin-top:5px; }
+  /* description revealed on hover */
+  .spot-desc{
+    font-size:0.86rem;color:#52546b;line-height:1.5;
+    margin-top:0; max-height:0; overflow:hidden; opacity:0;
+    transition: max-height .28s ease, opacity .22s ease, margin-top .22s ease;
   }
-  .spot .tagsrow{margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;}
-  .spot .mini{
-    font-size:0.72rem;
-    background:#f3eee0;
-    color:#6b6f8a;
-    padding:3px 8px;
-    border-radius:999px;
+  .spot:hover .spot-desc{
+    max-height:120px; opacity:1; margin-top:10px;
   }
-  .spot .address{
-    font-size:0.83rem;
-    color:#52546b;
-    margin-top:6px;
+  /* action row: like + favourite */
+  .spot-actions{
+    display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;
+  }
+  .action-btn{
+    display:inline-flex;align-items:center;gap:5px;
+    border:1.5px solid #e3ddcd;background:#fff;
+    border-radius:999px;padding:5px 12px;
+    font-size:0.82rem;font-family:'Inter',sans-serif;font-weight:600;
+    cursor:pointer;color:#52546b;
+    transition:border-color .14s, background .14s, color .14s;
+    user-select:none;
+  }
+  .action-btn:hover{ border-color:#b0b4d0; }
+  .action-btn.liked{
+    background:#fbe7e5;border-color:var(--coral);color:var(--coral);
+  }
+  .action-btn.faved{
+    background:#fff7eb;border-color:var(--amber);color:#b97d25;
+  }
+  .action-btn .like-count{ font-size:0.78rem;opacity:0.75; }
+  .osm-link{
+    font-size:0.78rem;color:#7a7e98;text-decoration:none;
+    margin-left:auto;padding:5px 2px;
+    display:inline-flex;align-items:center;gap:3px;
+  }
+  .osm-link:hover{ color:var(--amber); }
+
+  /* favourites section header */
+  .fav-header{
+    font-family:'Fraunces',serif;font-size:0.9rem;font-weight:600;
+    color:#b97d25;margin:4px 0 8px;display:flex;align-items:center;gap:6px;
   }
 
   .error-msg{
-    color:#b3413c;
-    background:#fbe7e5;
-    border-radius:10px;
-    padding:10px 13px;
-    font-size:0.85rem;
-    margin-top:10px;
+    color:#b3413c;background:#fbe7e5;border-radius:10px;
+    padding:10px 13px;font-size:0.85rem;margin-top:10px;
   }
-  .hint{color:var(--mist); font-size:0.85rem; text-align:center; margin-top:10px;}
-  .hidden{display:none !important;}
-
+  .hint{ color:var(--mist);font-size:0.85rem;text-align:center;margin-top:10px; }
   @media (max-width:420px){
-    .choices{grid-template-columns:1fr;}
-    .row2{grid-template-columns:1fr;}
+    .choices{ grid-template-columns:1fr; }
+    .row2{ grid-template-columns:1fr; }
   }
 </style>
 </head>
@@ -308,40 +219,21 @@
 </div>
 
 <script>
-/* =====================================================================
-   FIREBASE SETUP — paste your config below.
-   ===================================================================== */
 const firebaseConfig = {
   apiKey: "AIzaSyBQGD2VvJPvYyOS3mgxJIp-uHOamvENoPQ",
   databaseURL: "https://plan2gether-ccf06-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "plan2gether-ccf06",
 };
+
 let db = null;
 let firebaseReady = false;
 try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
   firebaseReady = true;
-} catch (e) {
-  console.error('Firebase init failed:', e);
-}
+} catch(e){ console.error('Firebase init failed:', e); }
 
-/* ---------------- STATE & STORAGE HELPERS ---------------- */
-const routeEl = document.getElementById('route');
-
-function render(html){
-  if(!firebaseReady){
-    routeEl.innerHTML = `
-      <div class="pin"></div>
-      <div class="card">
-        <h2>Setup needed</h2>
-        <p class="sub">This app can't connect to its database yet. Open this file, find the <code>firebaseConfig</code> object near the top of the &lt;script&gt; tag, and paste in your real Firebase project values (apiKey, databaseURL, projectId). See the setup steps that came with this file.</p>
-      </div>`;
-    return;
-  }
-  routeEl.innerHTML = `<div class="pin"></div>${html}`;
-}
-
+/* ---- DEVICE ID ---- */
 function getDeviceId(){
   let id = localStorage.getItem('p2g_device_id');
   if(!id){ id = 'm'+Math.random().toString(36).slice(2,10); localStorage.setItem('p2g_device_id', id); }
@@ -349,49 +241,83 @@ function getDeviceId(){
 }
 const deviceId = getDeviceId();
 
-function genCode(){
-  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let c='';
-  for(let i=0;i<5;i++) c+=chars[Math.floor(Math.random()*chars.length)];
-  return c;
+/* ---- FAVOURITES (per-device, per-party, stored in localStorage) ---- */
+function getFavKey(code){ return `p2g_favs_${code}`; }
+function getFavs(code){
+  try{ return JSON.parse(localStorage.getItem(getFavKey(code)) || '{}'); }
+  catch{ return {}; }
+}
+function setFav(code, spotId, spotData){
+  const favs = getFavs(code);
+  favs[spotId] = spotData;
+  localStorage.setItem(getFavKey(code), JSON.stringify(favs));
+}
+function removeFav(code, spotId){
+  const favs = getFavs(code);
+  delete favs[spotId];
+  localStorage.setItem(getFavKey(code), JSON.stringify(favs));
+}
+function isFav(code, spotId){
+  return !!getFavs(code)[spotId];
 }
 
+/* ---- FIREBASE HELPERS ---- */
+const routeEl = document.getElementById('route');
+function render(html){
+  if(!firebaseReady){
+    routeEl.innerHTML = `<div class="pin"></div><div class="card"><h2>Setup needed</h2><p class="sub">Paste your Firebase config values into the firebaseConfig object at the top of the script.</p></div>`;
+    return;
+  }
+  routeEl.innerHTML = `<div class="pin"></div>${html}`;
+}
+function genCode(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c=''; for(let i=0;i<5;i++) c+=chars[Math.floor(Math.random()*chars.length)]; return c;
+}
 async function getParty(code){
-  try{
-    const snap = await db.ref('parties/' + code).get();
-    return snap.exists() ? snap.val() : null;
-  }catch(e){
-    console.error('getParty failed:', e);
-    return null;
-  }
+  try{ const s=await db.ref('parties/'+code).get(); return s.exists()?s.val():null; }catch(e){ return null; }
 }
-async function setParty(code, data){
-  try{
-    await db.ref('parties/' + code).set(data);
-  }catch(e){
-    console.error('setParty failed:', e);
-  }
+async function setParty(code,data){ try{ await db.ref('parties/'+code).set(data); }catch(e){} }
+async function updateParty(code,patch){ try{ await db.ref('parties/'+code).update(patch); }catch(e){} }
+async function setMember(code,mid,data){ try{ await db.ref('parties/'+code+'/members/'+mid).set(data); }catch(e){} }
+
+/* likes are stored in Firebase so everyone in the party sees them */
+async function toggleLike(code, spotId){
+  const ref = db.ref(`parties/${code}/likes/${spotId}/${deviceId}`);
+  const snap = await ref.get();
+  if(snap.exists()){ await ref.remove(); return false; }
+  else { await ref.set(true); return true; }
 }
-async function updateParty(code, patch){
+async function getLikes(code){ /* returns {spotId: count} */
   try{
-    await db.ref('parties/' + code).update(patch);
-  }catch(e){
-    console.error('updateParty failed:', e);
-  }
+    const snap = await db.ref(`parties/${code}/likes`).get();
+    if(!snap.exists()) return {};
+    const raw = snap.val();
+    const out = {};
+    for(const [sid, voters] of Object.entries(raw)){
+      out[sid] = Object.keys(voters||{}).length;
+    }
+    return out;
+  }catch{ return {}; }
 }
-async function setMember(code, memberId, data){
+async function getMyLikes(code){
   try{
-    await db.ref('parties/' + code + '/members/' + memberId).set(data);
-  }catch(e){
-    console.error('setMember failed:', e);
-  }
+    const snap = await db.ref(`parties/${code}/likes`).get();
+    if(!snap.exists()) return new Set();
+    const raw = snap.val();
+    const mine = new Set();
+    for(const [sid, voters] of Object.entries(raw)){
+      if(voters && voters[deviceId]) mine.add(sid);
+    }
+    return mine;
+  }catch{ return new Set(); }
 }
 
 let currentCode = localStorage.getItem('p2g_party_code') || null;
 let pollTimer = null;
 function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
 
-/* ---------------- SCREEN: HOME ---------------- */
+/* ---- SCREEN: HOME ---- */
 function screenHome(){
   stopPoll();
   render(`
@@ -399,22 +325,15 @@ function screenHome(){
       <h2>Where are you two (or more) hanging out?</h2>
       <p class="sub">Start a party, or join one with a code from a friend.</p>
       <div class="choices">
-        <button class="choice-btn" id="goCreate">
-          <strong>Create a party</strong>
-          <span>You'll get a code to share</span>
-        </button>
-        <button class="choice-btn" id="goJoin">
-          <strong>Join a party</strong>
-          <span>Got a code already</span>
-        </button>
+        <button class="choice-btn" id="goCreate"><strong>Create a party</strong><span>You'll get a code to share</span></button>
+        <button class="choice-btn" id="goJoin"><strong>Join a party</strong><span>Got a code already</span></button>
       </div>
-    </div>
-  `);
+    </div>`);
   document.getElementById('goCreate').onclick = screenCreate;
   document.getElementById('goJoin').onclick = screenJoinCode;
 }
 
-/* ---------------- SCREEN: CREATE ---------------- */
+/* ---- SCREEN: CREATE ---- */
 function screenCreate(){
   render(`
     <div class="card">
@@ -422,13 +341,11 @@ function screenCreate(){
       <p class="sub">You'll be the party leader — you choose the area and start the search once everyone's in.</p>
       <button class="btn btn-primary" id="makeCode">Generate party code</button>
       <button class="small-link" id="back1">← back</button>
-    </div>
-  `);
+    </div>`);
   document.getElementById('back1').onclick = screenHome;
   document.getElementById('makeCode').onclick = async ()=>{
     const code = genCode();
-    const party = { code, leaderId: deviceId, location:null, status:'collecting', members:{}, createdAt: Date.now() };
-    await setParty(code, party);
+    await setParty(code, { code, leaderId:deviceId, location:null, status:'collecting', members:{}, createdAt:Date.now() });
     currentCode = code;
     localStorage.setItem('p2g_party_code', code);
     localStorage.setItem('p2g_is_leader', '1');
@@ -436,30 +353,29 @@ function screenCreate(){
   };
 }
 
-/* ---------------- SCREEN: JOIN ---------------- */
+/* ---- SCREEN: JOIN ---- */
 function screenJoinCode(){
   render(`
     <div class="card">
       <h2>Join a party</h2>
       <p class="sub">Enter the 5-character code your friend sent you.</p>
       <label>Party code</label>
-      <input type="text" id="codeInput" maxlength="5" placeholder="e.g. K7QXT" style="text-transform:uppercase; letter-spacing:0.15em; font-family:'JetBrains Mono',monospace; font-weight:700;">
+      <input type="text" id="codeInput" maxlength="5" placeholder="e.g. K7QXT" style="text-transform:uppercase;letter-spacing:0.15em;font-family:'JetBrains Mono',monospace;font-weight:700;">
       <div id="joinErr"></div>
       <button class="btn btn-primary" id="checkCode">Continue</button>
       <button class="small-link" id="back2">← back</button>
-    </div>
-  `);
+    </div>`);
   document.getElementById('back2').onclick = screenHome;
-  const input = document.getElementById('codeInput');
-  input.addEventListener('input', ()=>{ input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
+  const inp = document.getElementById('codeInput');
+  inp.addEventListener('input', ()=>{ inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
   document.getElementById('checkCode').onclick = async ()=>{
-    const code = input.value.trim();
-    const errBox = document.getElementById('joinErr');
-    errBox.innerHTML='';
-    if(code.length<4){ errBox.innerHTML = `<div class="error-msg">Enter the full code.</div>`; return; }
+    const code = inp.value.trim();
+    const err = document.getElementById('joinErr');
+    err.innerHTML = '';
+    if(code.length<4){ err.innerHTML=`<div class="error-msg">Enter the full code.</div>`; return; }
     const party = await getParty(code);
-    if(!party){ errBox.innerHTML = `<div class="error-msg">No party found with that code. Double-check with your friend.</div>`; return; }
-    if(party.status === 'done'){ errBox.innerHTML = `<div class="error-msg">This party already finished its search.</div>`; return; }
+    if(!party){ err.innerHTML=`<div class="error-msg">No party found with that code.</div>`; return; }
+    if(party.status==='done'){ err.innerHTML=`<div class="error-msg">This party already finished its search.</div>`; return; }
     currentCode = code;
     localStorage.setItem('p2g_party_code', code);
     localStorage.setItem('p2g_is_leader','0');
@@ -467,7 +383,7 @@ function screenJoinCode(){
   };
 }
 
-/* ---------------- SCREEN: PROFILE FORM ---------------- */
+/* ---- PREFERENCES ---- */
 const PREF_OPTIONS = [
   {k:'chill', label:'Chill / hangout'},
   {k:'romantic', label:'Romantic'},
@@ -478,7 +394,10 @@ const PREF_OPTIONS = [
   {k:'outdoors', label:'Outdoors / nature'},
   {k:'culture', label:'Culture / museums'},
 ];
+function prettyPref(k){ const f=PREF_OPTIONS.find(p=>p.k===k); return f?f.label:k; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+/* ---- SCREEN: PROFILE ---- */
 function screenProfile(isLeader){
   const selected = new Set();
   render(`
@@ -492,416 +411,351 @@ function screenProfile(isLeader){
       <label>Your name</label>
       <input type="text" id="pName" placeholder="e.g. Mariana">
       <div class="row2">
-        <div>
-          <label>Age</label>
-          <input type="number" id="pAge" min="1" max="120" placeholder="22">
-        </div>
-        <div>
-          <label>Your budget (€)</label>
-          <input type="number" id="pBudget" min="0" placeholder="30">
-        </div>
+        <div><label>Age</label><input type="number" id="pAge" min="1" max="120" placeholder="22"></div>
+        <div><label>Your budget (€)</label><input type="number" id="pBudget" min="0" placeholder="30"></div>
       </div>
       <label>What are you in the mood for? (pick 1–3)</label>
       <div class="tags" id="tagWrap">
         ${PREF_OPTIONS.map(p=>`<button type="button" class="tag" data-k="${p.k}">${p.label}</button>`).join('')}
       </div>
       <div id="profErr"></div>
-      <button class="btn btn-primary" id="submitProfile">${isLeader? 'Save & continue to lobby' : 'Save & join lobby'}</button>
-    </div>
-  `);
-
+      <button class="btn btn-primary" id="submitProfile">${isLeader?'Save & continue to lobby':'Save & join lobby'}</button>
+    </div>`);
   document.querySelectorAll('#tagWrap .tag').forEach(btn=>{
-    btn.onclick = ()=>{
-      const k = btn.dataset.k;
+    btn.onclick=()=>{
+      const k=btn.dataset.k;
       if(selected.has(k)){ selected.delete(k); btn.classList.remove('active'); }
-      else{
-        if(selected.size>=3) return;
-        selected.add(k); btn.classList.add('active');
-      }
+      else{ if(selected.size>=3) return; selected.add(k); btn.classList.add('active'); }
     };
   });
-
   document.getElementById('submitProfile').onclick = async ()=>{
-    const name = document.getElementById('pName').value.trim();
-    const age = document.getElementById('pAge').value;
-    const budget = document.getElementById('pBudget').value;
-    const errBox = document.getElementById('profErr');
-    errBox.innerHTML='';
-    if(!name || !age || !budget || selected.size===0){
-      errBox.innerHTML = `<div class="error-msg">Fill in your name, age, budget, and at least one preference.</div>`;
-      return;
-    }
-    const party = await getParty(currentCode);
-    if(!party){ errBox.innerHTML = `<div class="error-msg">This party no longer exists.</div>`; return; }
-    await setMember(currentCode, deviceId, {
-      name, age:Number(age), budget:Number(budget),
-      prefs:Array.from(selected), ready:true, joinedAt:Date.now()
-    });
+    const name=document.getElementById('pName').value.trim();
+    const age=document.getElementById('pAge').value;
+    const budget=document.getElementById('pBudget').value;
+    const err=document.getElementById('profErr');
+    err.innerHTML='';
+    if(!name||!age||!budget||selected.size===0){ err.innerHTML=`<div class="error-msg">Fill in your name, age, budget, and at least one preference.</div>`; return; }
+    const party=await getParty(currentCode);
+    if(!party){ err.innerHTML=`<div class="error-msg">This party no longer exists.</div>`; return; }
+    await setMember(currentCode, deviceId, {name, age:Number(age), budget:Number(budget), prefs:Array.from(selected), ready:true, joinedAt:Date.now()});
     screenLobby(isLeader);
   };
 }
 
-/* ---------------- SCREEN: LOBBY ---------------- */
-function screenLobby(isLeader){
-  stopPoll();
-  renderLobby(isLeader, null);
-  getParty(currentCode).then(p=> p && renderLobby(isLeader, p));
-  pollTimer = setInterval(async ()=>{
-    const party = await getParty(currentCode);
-    if(!party) return;
-    if(party.status === 'searching' || party.status === 'done'){
-      stopPoll();
-      screenResults();
-      return;
-    }
-    refreshLobbyMembers(isLeader, party);
-  }, 2200);
-}
-
+/* ---- SCREEN: LOBBY ---- */
 function memberRowsHtml(members){
   return members.map(m=>`
     <div class="member-row">
-      <div>
-        <div class="who">${escapeHtml(m.name)}</div>
-        <div class="meta">${m.age} yrs · €${m.budget} · ${m.prefs.map(prettyPref).join(', ')}</div>
-      </div>
+      <div><div class="who">${escapeHtml(m.name)}</div><div class="meta">${m.age} yrs · €${m.budget} · ${m.prefs.map(prettyPref).join(', ')}</div></div>
       <span class="badge ready">ready</span>
-    </div>
-  `).join('') || `<p class="sub">No one has joined yet.</p>`;
+    </div>`).join('') || `<p class="sub">No one has joined yet.</p>`;
 }
-
 function refreshLobbyMembers(isLeader, party){
-  const members = Object.values(party.members||{});
-  const countEl = document.getElementById('memberCountText');
-  const rowsEl = document.getElementById('memberRowsWrap');
-  if(!countEl || !rowsEl) return;
-  countEl.textContent = `${members.length} joined`;
-  rowsEl.innerHTML = memberRowsHtml(members);
+  const members=Object.values(party.members||{});
+  const ct=document.getElementById('memberCountText');
+  const rw=document.getElementById('memberRowsWrap');
+  if(!ct||!rw) return;
+  ct.textContent=`${members.length} joined`;
+  rw.innerHTML=memberRowsHtml(members);
   if(isLeader){
-    const searchBtn = document.getElementById('searchBtn');
-    const hintEl = document.getElementById('lobbyHint');
-    if(searchBtn) searchBtn.disabled = members.length===0;
-    if(hintEl) hintEl.textContent = `${members.length} ${members.length===1?'person has':'people have'} joined so far. You can search anytime — new joiners just won't be counted.`;
+    const sb=document.getElementById('searchBtn');
+    const h=document.getElementById('lobbyHint');
+    if(sb) sb.disabled=members.length===0;
+    if(h) h.textContent=`${members.length} ${members.length===1?'person has':'people have'} joined so far.`;
   }
 }
-
+function screenLobby(isLeader){
+  stopPoll();
+  renderLobby(isLeader, null);
+  getParty(currentCode).then(p=>p&&renderLobby(isLeader,p));
+  pollTimer=setInterval(async()=>{
+    const party=await getParty(currentCode);
+    if(!party) return;
+    if(party.status==='searching'||party.status==='done'){ stopPoll(); screenResults(); return; }
+    refreshLobbyMembers(isLeader, party);
+  }, 2200);
+}
 function renderLobby(isLeader, party){
-  if(!party){
-    render(`<div class="card"><h2>Loading party…</h2></div>`);
-    return;
-  }
-  const members = Object.values(party.members||{});
-  const rows = memberRowsHtml(members);
-
-  const leaderControls = isLeader ? `
+  if(!party){ render(`<div class="card"><h2>Loading party…</h2></div>`); return; }
+  const members=Object.values(party.members||{});
+  const leaderControls=isLeader?`
     <label>General area (e.g. Lisbon, Cascais...)</label>
-    <input type="text" id="locInput" placeholder="Lisbon" value="${party.location? escapeHtml(party.location):''}">
+    <input type="text" id="locInput" placeholder="Lisbon" value="${party.location?escapeHtml(party.location):''}">
     <div id="lobbyErr"></div>
     <button class="btn btn-primary" id="searchBtn" ${members.length===0?'disabled':''}>Search hangout spots</button>
-    <p class="hint" id="lobbyHint">${members.length} ${members.length===1?'person has':'people have'} joined so far. You can search anytime — new joiners just won't be counted.</p>
-  ` : `
-    <p class="hint">Waiting for the party leader to pick an area and hit search…</p>
-  `;
-
+    <p class="hint" id="lobbyHint">${members.length} ${members.length===1?'person has':'people have'} joined so far.</p>
+  `:`<p class="hint">Waiting for the party leader to pick an area and hit search…</p>`;
   render(`
-    <div class="ticket">
-      <div class="label">Party code — share this</div>
-      <div class="code">${currentCode}</div>
-    </div>
-    <div class="card">
-      <h2>Lobby</h2>
-      <p class="sub" id="memberCountText">${members.length} joined</p>
-      <div id="memberRowsWrap">${rows}</div>
-    </div>
-    <div class="card">
-      ${leaderControls}
-    </div>
-    <button class="small-link" id="leaveBtn">Leave / start over</button>
-  `);
-
-  document.getElementById('leaveBtn').onclick = ()=>{
-    stopPoll();
-    localStorage.removeItem('p2g_party_code');
-    localStorage.removeItem('p2g_is_leader');
-    currentCode = null;
-    screenHome();
-  };
-
+    <div class="ticket"><div class="label">Party code — share this</div><div class="code">${currentCode}</div></div>
+    <div class="card"><h2>Lobby</h2><p class="sub" id="memberCountText">${members.length} joined</p><div id="memberRowsWrap">${memberRowsHtml(members)}</div></div>
+    <div class="card">${leaderControls}</div>
+    <button class="small-link" id="leaveBtn">Leave / start over</button>`);
+  document.getElementById('leaveBtn').onclick=()=>{ stopPoll(); localStorage.removeItem('p2g_party_code'); localStorage.removeItem('p2g_is_leader'); currentCode=null; screenHome(); };
   if(isLeader){
-    document.getElementById('searchBtn').onclick = async ()=>{
-      const loc = document.getElementById('locInput').value.trim();
-      const errBox = document.getElementById('lobbyErr');
-      if(!loc){ errBox.innerHTML = `<div class="error-msg">Type a general area first.</div>`; return; }
-      await updateParty(currentCode, { location: loc, status: 'searching' });
-      stopPoll();
-      screenResults();
+    document.getElementById('searchBtn').onclick=async()=>{
+      const loc=document.getElementById('locInput').value.trim();
+      const err=document.getElementById('lobbyErr');
+      if(!loc){ err.innerHTML=`<div class="error-msg">Type a general area first.</div>`; return; }
+      await updateParty(currentCode, { location:loc, status:'searching' });
+      stopPoll(); screenResults();
     };
   }
 }
 
-function prettyPref(k){
-  const f = PREF_OPTIONS.find(p=>p.k===k);
-  return f? f.label : k;
-}
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+/* ---- SCREEN: RESULTS ---- */
+// Holds the current suggestions array so we can re-render without re-fetching
+let lastSuggestions = [];
 
-/* ---------------- SCREEN: RESULTS ---------------- */
 async function screenResults(){
   render(`<div class="card"><h2>Checking the weather &amp; matching spots…</h2><p class="sub">One moment.</p></div>`);
-  const party = await getParty(currentCode);
+  const party=await getParty(currentCode);
   if(!party){ screenHome(); return; }
-  const members = Object.values(party.members||{});
-  const weather = await fetchWeather(party.location);
-  const suggestions = await fetchOSMSpots(party.location, members, weather);
+  const members=Object.values(party.members||{});
+  const weather=await fetchWeather(party.location);
+  const newSpots=await fetchOSMSpots(party.location, members, weather);
 
-  if(party.status !== 'done'){
-    await updateParty(currentCode, { status: 'done' });
-  }
+  /* merge: keep pinned favourites at top, append fresh results below */
+  const favs=getFavs(currentCode);
+  const favIds=new Set(Object.keys(favs));
+  const freshIds=new Set(newSpots.map(s=>s.id));
 
-  const spotsHtml = suggestions.length
-    ? suggestions.map(spotCard).join('')
-    : `<p class="sub">Couldn't find venues for "${escapeHtml(party.location)}". Try a bigger or nearby place name.</p>`;
+  // Spots that are faved but didn't appear in fresh results → keep them
+  const pinnedFavSpots=Object.values(favs).filter(s=>!freshIds.has(s.id));
+  // Fresh spots that happen to be faved too get the fav flag applied below
+  const allSpots=[...pinnedFavSpots, ...newSpots];
+  // dedupe by id
+  const seen=new Set(); lastSuggestions=[];
+  for(const s of allSpots){ if(!seen.has(s.id)){ seen.add(s.id); lastSuggestions.push(s); } }
+
+  if(party.status!=='done') await updateParty(currentCode, { status:'done' });
+
+  const likes=await getLikes(currentCode);
+  const myLikes=await getMyLikes(currentCode);
+
+  renderResultsScreen(party.location, members.length, weather, likes, myLikes);
+}
+
+function renderResultsScreen(location, memberCount, weather, likes, myLikes){
+  const favs=getFavs(currentCode);
+  const favSpots=lastSuggestions.filter(s=>favs[s.id]);
+  const nonFavSpots=lastSuggestions.filter(s=>!favs[s.id]);
+
+  const favsSection=favSpots.length ? `
+    <div class="fav-header">⭐ Saved favourites</div>
+    ${favSpots.map(s=>spotCard(s, likes, myLikes, favs)).join('')}
+    <hr style="border:none;border-top:1.5px dashed #e3ddcd;margin:14px 0 12px;">
+  ` : '';
+
+  const freshSection=nonFavSpots.length
+    ? nonFavSpots.map(s=>spotCard(s, likes, myLikes, favs)).join('')
+    : favSpots.length ? `<p class="sub" style="color:#7a7e98;font-size:0.88rem;">All results are saved as favourites above.</p>`
+    : `<p class="sub">Couldn't find venues for "${escapeHtml(location)}". Try a bigger or nearby place name.</p>`;
 
   render(`
     <div class="card">
-      <h2>Spots in ${escapeHtml(party.location)}</h2>
-      <p class="sub">Based on ${members.length} ${members.length===1?'person':'people'}'s preferences.</p>
+      <h2>Spots in ${escapeHtml(location)}</h2>
+      <p class="sub">Based on ${memberCount} ${memberCount===1?'person':'people'}'s preferences.</p>
       <div class="weather-strip">
         <div class="emoji">${weather.emoji}</div>
-        <div class="wtext">
-          <strong>${weather.label}, ${weather.temp}°C</strong>
-          <span>${weather.note}</span>
-        </div>
+        <div class="wtext"><strong>${weather.label}, ${weather.temp}°C</strong><span>${weather.note}</span></div>
       </div>
-      ${spotsHtml}
-      ${suggestions.length ? `<p class="hint" style="margin-top:6px;">Spots sourced from OpenStreetMap contributors.</p>` : ''}
+      ${favsSection}
+      ${freshSection}
+      ${lastSuggestions.length?`<p class="hint" style="margin-top:6px;">Spots sourced from OpenStreetMap contributors.</p>`:''}
     </div>
     <button class="btn btn-secondary" id="reSearch">Search again</button>
-    <button class="small-link" id="newParty">Start a new party</button>
-  `);
+    <button class="small-link" id="newParty">Start a new party</button>`);
 
-  document.querySelectorAll('.spot[data-osm-uri]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const uri = el.getAttribute('data-osm-uri');
-      if(uri) window.open(uri, '_blank', 'noopener');
+  /* wire up like / fav buttons — no page reload, just re-render */
+  document.querySelectorAll('.action-btn[data-action]').forEach(btn=>{
+    btn.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const action=btn.dataset.action;
+      const sid=btn.dataset.sid;
+      const spot=lastSuggestions.find(s=>s.id===sid);
+      if(!spot) return;
+
+      if(action==='like'){
+        await toggleLike(currentCode, sid);
+        const newLikes=await getLikes(currentCode);
+        const newMyLikes=await getMyLikes(currentCode);
+        renderResultsScreen(location, memberCount, weather, newLikes, newMyLikes);
+      } else if(action==='fav'){
+        if(isFav(currentCode, sid)){ removeFav(currentCode, sid); }
+        else { setFav(currentCode, sid, spot); }
+        const newLikes=await getLikes(currentCode);
+        const newMyLikes=await getMyLikes(currentCode);
+        renderResultsScreen(location, memberCount, weather, newLikes, newMyLikes);
+      }
     });
-    el.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); el.click(); } });
   });
 
-  document.getElementById('reSearch').onclick = ()=> screenResults();
-  document.getElementById('newParty').onclick = ()=>{
+  /* OSM open links */
+  document.querySelectorAll('.osm-link').forEach(a=>{
+    a.addEventListener('click', e=>e.stopPropagation());
+  });
+
+  document.getElementById('reSearch').onclick=()=> screenResults();
+  document.getElementById('newParty').onclick=()=>{
     localStorage.removeItem('p2g_party_code');
     localStorage.removeItem('p2g_is_leader');
-    currentCode = null;
-    screenHome();
+    currentCode=null; screenHome();
   };
 }
 
-function spotCard(s){
+function spotCard(s, likes, myLikes, favs){
+  const likeCount=(likes&&likes[s.id])||0;
+  const iLiked=myLikes&&myLikes.has(s.id);
+  const faved=favs&&favs[s.id];
+  const desc=buildDescription(s);
   return `
-    <div class="spot" data-osm-uri="${escapeHtml(s.osmUri)}" tabindex="0" role="link" aria-label="Open ${escapeHtml(s.name)} on OpenStreetMap">
+    <div class="spot${faved?' is-fav':''}" data-id="${escapeHtml(s.id)}">
       <div class="spot-top">
-        <div>
+        <div class="spot-title-block">
           <div class="cat">${escapeHtml(s.cat)}</div>
           <h3>${escapeHtml(s.name)}</h3>
+          ${s.address?`<div class="address">📍 ${escapeHtml(s.address)}</div>`:''}
         </div>
-        ${s.openNow !== null ? `<span class="fit">${s.openNow ? '🟢 Open' : '🔴 Closed'}</span>` : ''}
+        ${faved?`<span style="font-size:1.1rem;line-height:1;" title="Saved favourite">⭐</span>`:''}
       </div>
-      ${s.address ? `<div class="address">📍 ${escapeHtml(s.address)}</div>` : ''}
-      <div class="tagsrow">
-        ${s.website ? `<span class="mini">🌐 Has website</span>` : ''}
-        ${s.phone ? `<span class="mini">📞 Has phone</span>` : ''}
-        <span class="mini">Click to open on OSM ↗</span>
+      <div class="spot-desc">${escapeHtml(desc)}</div>
+      <div class="spot-actions">
+        <button class="action-btn${iLiked?' liked':''}" data-action="like" data-sid="${escapeHtml(s.id)}" title="${iLiked?'Unlike':'Like this spot'}">
+          ${iLiked?'❤️':'🤍'} Like${likeCount>0?` <span class="like-count">(${likeCount})</span>`:''}
+        </button>
+        <button class="action-btn${faved?' faved':''}" data-action="fav" data-sid="${escapeHtml(s.id)}" title="${faved?'Remove from favourites':'Save as favourite'}">
+          ${faved?'⭐ Saved':'☆ Favourite'}
+        </button>
+        <a class="osm-link" href="${escapeHtml(s.osmUri)}" target="_blank" rel="noopener" title="Open on OpenStreetMap">↗ OSM</a>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
-/* ---------------- WEATHER (Open-Meteo, no key needed) ---------------- */
+/* Generate a short human description from OSM tags */
+function buildDescription(s){
+  const parts=[];
+  if(s.cat) parts.push(`A ${s.cat.toLowerCase()} spot`);
+  if(s.hasHours) parts.push('opening hours listed');
+  if(s.website) parts.push('has a website');
+  if(s.phone) parts.push('phone number available');
+  if(s.address) parts.push(`located at ${s.address}`);
+  return parts.length ? parts.join(' · ') + '.' : 'Sourced from OpenStreetMap. Click ↗ OSM to see full details.';
+}
+
+/* ---- WEATHER ---- */
 async function fetchWeather(location){
   try{
-    const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`);
-    const geo = await geoRes.json();
-    if(!geo.results || !geo.results.length) throw new Error('no geo');
-    const {latitude, longitude} = geo.results[0];
-    const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`);
-    const w = await wRes.json();
-    const code = w.current.weather_code;
-    const temp = Math.round(w.current.temperature_2m);
-    return interpretWeather(code, temp);
+    const g=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`).then(r=>r.json());
+    if(!g.results||!g.results.length) throw new Error('no geo');
+    const {latitude,longitude}=g.results[0];
+    const w=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`).then(r=>r.json());
+    return interpretWeather(w.current.weather_code, Math.round(w.current.temperature_2m));
   }catch(e){
-    return { label:'Mild', temp:18, code:1, emoji:'⛅', note:'Couldn\'t reach live weather — assuming pleasant conditions.', isOutdoorFriendly:true, isRainy:false };
+    return {label:'Mild',temp:18,emoji:'⛅',note:"Couldn't reach live weather — assuming pleasant conditions.",isOutdoorFriendly:true};
   }
 }
-
-function interpretWeather(code, temp){
-  const rainy = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(code);
-  const stormy = [95,96,99].includes(code);
-  const snowy = [71,73,75,77,85,86].includes(code);
-  const cloudy = [1,2,3,45,48].includes(code);
-  const clear = [0].includes(code);
-
-  let label, emoji, note, isOutdoorFriendly;
-  if(stormy){ label='Stormy'; emoji='⛈️'; note='Thunderstorms expected — definitely staying indoors.'; isOutdoorFriendly=false; }
-  else if(rainy){ label='Rainy'; emoji='🌧️'; note='Rain in the area — indoor spots only.'; isOutdoorFriendly=false; }
-  else if(snowy){ label='Snowy'; emoji='❄️'; note='Snow around — cozy indoor spots recommended.'; isOutdoorFriendly=false; }
-  else if(clear && temp>=14){ label='Clear'; emoji='☀️'; note='Great conditions for outdoor plans too.'; isOutdoorFriendly=true; }
-  else if(cloudy){ label='Cloudy'; emoji='⛅'; note='Cloudy but dry — outdoor spots are fine.'; isOutdoorFriendly=true; }
-  else { label='Cool'; emoji='🌥️'; note='A bit chilly — outdoor okay if bundled up.'; isOutdoorFriendly= temp>=10; }
-
-  return { label, emoji, note, temp, code, isOutdoorFriendly, isRainy: rainy||stormy||snowy };
+function interpretWeather(code,temp){
+  const rainy=[51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(code);
+  const stormy=[95,96,99].includes(code);
+  const snowy=[71,73,75,77,85,86].includes(code);
+  const cloudy=[1,2,3,45,48].includes(code);
+  const clear=[0].includes(code);
+  let label,emoji,note,isOutdoorFriendly;
+  if(stormy){label='Stormy';emoji='⛈️';note='Thunderstorms — staying indoors.';isOutdoorFriendly=false;}
+  else if(rainy){label='Rainy';emoji='🌧️';note='Rain expected — indoor spots only.';isOutdoorFriendly=false;}
+  else if(snowy){label='Snowy';emoji='❄️';note='Snow around — cozy indoor spots.';isOutdoorFriendly=false;}
+  else if(clear&&temp>=14){label='Clear';emoji='☀️';note='Great for outdoor plans too.';isOutdoorFriendly=true;}
+  else if(cloudy){label='Cloudy';emoji='⛅';note='Cloudy but dry — outdoor is fine.';isOutdoorFriendly=true;}
+  else{label='Cool';emoji='🌥️';note='A bit chilly — outdoor okay if bundled up.';isOutdoorFriendly=temp>=10;}
+  return{label,emoji,note,temp,code,isOutdoorFriendly};
 }
 
-/* ---------------- VENUE LOOKUP via Nominatim + Overpass API ----------
-   Nominatim: free OSM geocoding (no key needed).
-   Overpass API: free OSM POI search (no key needed).
-   Both require a descriptive User-Agent header.                        */
-
-// Maps preference keys to OSM amenity/leisure/tourism tags
-// We keep two lists: indoor-biased and outdoor-biased
-const OSM_TAGS = {
-  chill:      { outdoor: [['leisure','park'],['amenity','biergarten']], indoor: [['amenity','bar'],['amenity','pub']] },
-  romantic:   { outdoor: [['tourism','viewpoint'],['leisure','park']], indoor: [['amenity','restaurant']] },
-  games:      { outdoor: [['leisure','mini_golf'],['leisure','sports_centre']], indoor: [['amenity','arcade'],['leisure','escape_game']] },
-  restaurant: { outdoor: [['amenity','restaurant'],['amenity','fast_food']], indoor: [['amenity','restaurant']] },
-  coffee:     { outdoor: [['amenity','cafe']], indoor: [['amenity','cafe']] },
-  nightlife:  { outdoor: [['amenity','bar'],['amenity','pub']], indoor: [['amenity','nightclub'],['amenity','bar']] },
-  outdoors:   { outdoor: [['leisure','park'],['leisure','nature_reserve'],['leisure','garden']], indoor: [['leisure','sports_centre']] },
-  culture:    { outdoor: [['tourism','monument'],['historic','*']], indoor: [['tourism','museum'],['tourism','gallery']] },
+/* ---- OSM VENUE LOOKUP ---- */
+const OSM_TAGS={
+  chill:      {outdoor:[['leisure','park'],['amenity','biergarten']],          indoor:[['amenity','bar'],['amenity','pub']]},
+  romantic:   {outdoor:[['tourism','viewpoint'],['leisure','park']],           indoor:[['amenity','restaurant']]},
+  games:      {outdoor:[['leisure','mini_golf'],['leisure','sports_centre']],  indoor:[['amenity','arcade'],['leisure','escape_game']]},
+  restaurant: {outdoor:[['amenity','restaurant']],                             indoor:[['amenity','restaurant']]},
+  coffee:     {outdoor:[['amenity','cafe']],                                   indoor:[['amenity','cafe']]},
+  nightlife:  {outdoor:[['amenity','bar'],['amenity','pub']],                  indoor:[['amenity','nightclub'],['amenity','bar']]},
+  outdoors:   {outdoor:[['leisure','park'],['leisure','nature_reserve']],      indoor:[['leisure','sports_centre']]},
+  culture:    {outdoor:[['tourism','monument']],                               indoor:[['tourism','museum'],['tourism','gallery']]},
 };
+const UA='Plan2Gether/1.0 (group hangout planner)';
 
-const USER_AGENT = 'Plan2Gether/1.0 (group hangout planner; contact via github)';
-
-/* Step 1: resolve city name → bounding box via Nominatim */
 async function geocodeCity(location){
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1&addressdetails=0`;
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept-Language': 'en' } });
-  const data = await res.json();
-  if(!data || !data.length) throw new Error('City not found: ' + location);
-  const r = data[0];
-  return {
-    lat: parseFloat(r.lat),
-    lon: parseFloat(r.lon),
-    // bbox is [south, north, west, east] from Nominatim but we want a radius instead
-  };
+  const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,{headers:{'User-Agent':UA,'Accept-Language':'en'}}).then(r=>r.json());
+  if(!r||!r.length) throw new Error('City not found');
+  return{lat:parseFloat(r[0].lat),lon:parseFloat(r[0].lon)};
 }
-
-/* Step 2: query Overpass for POIs near the city centre */
-async function overpassQuery(lat, lon, tagPairs, radiusMetres = 3000, limit = 8){
-  // Build a union of all tag conditions
-  const conditions = tagPairs.map(([k,v]) => {
-    const tagFilter = v === '*' ? `["${k}"]` : `["${k}"="${v}"]`;
-    return `node${tagFilter}(around:${radiusMetres},${lat},${lon});
-    way${tagFilter}(around:${radiusMetres},${lat},${lon});`;
+async function overpassQuery(lat,lon,tagPairs,radius=3000,limit=8){
+  const conds=tagPairs.map(([k,v])=>{
+    const f=v==='*'?`["${k}"]`:`["${k}"="${v}"]`;
+    return `node${f}(around:${radius},${lat},${lon});\nway${f}(around:${radius},${lat},${lon});`;
   }).join('\n');
-
-  const query = `[out:json][timeout:10];
-(
-  ${conditions}
-);
-out center ${limit} qt;`;
-
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': USER_AGENT },
-    body: 'data=' + encodeURIComponent(query),
-  });
-  const data = await res.json();
-  return data.elements || [];
+  const q=`[out:json][timeout:10];(\n${conds}\n);out center ${limit} qt;`;
+  const r=await fetch('https://overpass-api.de/api/interpreter',{
+    method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':UA},
+    body:'data='+encodeURIComponent(q)
+  }).then(r=>r.json());
+  return r.elements||[];
 }
-
-/* Step 3: turn raw OSM elements into spot objects */
-function osmElementToSpot(el, cat){
-  const tags = el.tags || {};
-  const name = tags.name || tags['name:en'] || null;
-  if(!name) return null; // skip unnamed POIs
-
-  const lat = el.lat || (el.center && el.center.lat);
-  const lon = el.lon || (el.center && el.center.lon);
-
-  // Build address from OSM addr:* tags
-  const addrParts = [
-    tags['addr:housenumber'] && tags['addr:street']
-      ? `${tags['addr:street']} ${tags['addr:housenumber']}`
-      : tags['addr:street'],
-    tags['addr:city'],
-  ].filter(Boolean);
-  const address = addrParts.join(', ') || null;
-
-  // Opening hours: very rough heuristic
-  let openNow = null;
-  if(tags.opening_hours){
-    // Just flag that info exists — full parsing is a whole library
-    openNow = null; // we'll show "has hours" tag instead
-  }
-
-  const osmUri = lat && lon
-    ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`
-    : `https://www.openstreetmap.org/search?query=${encodeURIComponent(name)}`;
-
-  return {
-    id: String(el.type) + String(el.id),
-    name,
-    cat,
-    address,
-    openNow,
-    website: tags.website || tags['contact:website'] || null,
-    phone: tags.phone || tags['contact:phone'] || null,
-    hasHours: !!tags.opening_hours,
-    osmUri,
+function osmElementToSpot(el,cat){
+  const tags=el.tags||{};
+  const name=tags.name||tags['name:en']||null;
+  if(!name) return null;
+  const lat=el.lat||(el.center&&el.center.lat);
+  const lon=el.lon||(el.center&&el.center.lon);
+  const addr=[
+    tags['addr:street']&&tags['addr:housenumber']?`${tags['addr:street']} ${tags['addr:housenumber']}`:tags['addr:street'],
+    tags['addr:city']
+  ].filter(Boolean).join(', ')||null;
+  const osmUri=lat&&lon
+    ?`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`
+    :`https://www.openstreetmap.org/search?query=${encodeURIComponent(name)}`;
+  return{
+    id:String(el.type)+String(el.id),name,cat,address:addr,
+    website:tags.website||tags['contact:website']||null,
+    phone:tags.phone||tags['contact:phone']||null,
+    hasHours:!!tags.opening_hours,
+    osmUri
   };
 }
-
-async function fetchOSMSpots(location, members, weather){
-  // Tally preferences
-  const tally = {};
-  members.forEach(m => m.prefs.forEach(p => { tally[p] = (tally[p]||0)+1; }));
-  let prefOrder = Object.keys(tally).sort((a,b)=> tally[b]-tally[a]);
-  if(prefOrder.length===0) prefOrder = ['chill'];
-
+async function fetchOSMSpots(location,members,weather){
+  const tally={};
+  members.forEach(m=>m.prefs.forEach(p=>{tally[p]=(tally[p]||0)+1;}));
+  let prefs=Object.keys(tally).sort((a,b)=>tally[b]-tally[a]);
+  if(!prefs.length) prefs=['chill'];
   let centre;
-  try{ centre = await geocodeCity(location); }
-  catch(e){ console.error('Geocode failed:', e); return []; }
-
-  const bias = weather.isOutdoorFriendly ? 'outdoor' : 'indoor';
-  const seen = new Set();
-  const results = [];
-
-  // Search top 2 prefs
-  for(const pref of prefOrder.slice(0, 2)){
-    const tagDef = OSM_TAGS[pref] || OSM_TAGS.chill;
-    const tags = tagDef[bias];
-    const catLabel = prettyPref(pref);
+  try{ centre=await geocodeCity(location); }catch(e){ return []; }
+  const bias=weather.isOutdoorFriendly?'outdoor':'indoor';
+  const seen=new Set(); const results=[];
+  for(const pref of prefs.slice(0,2)){
+    const tagDef=OSM_TAGS[pref]||OSM_TAGS.chill;
+    const tags=tagDef[bias];
     try{
-      const elements = await overpassQuery(centre.lat, centre.lon, tags, 3000, 10);
-      for(const el of elements){
-        const spot = osmElementToSpot(el, catLabel);
-        if(!spot || seen.has(spot.id)) continue;
-        seen.add(spot.id);
-        results.push(spot);
-        if(results.length >= 8) break;
+      const els=await overpassQuery(centre.lat,centre.lon,tags,3000,10);
+      for(const el of els){
+        const spot=osmElementToSpot(el,prettyPref(pref));
+        if(!spot||seen.has(spot.id)) continue;
+        seen.add(spot.id); results.push(spot);
+        if(results.length>=8) break;
       }
-    }catch(e){ console.error('Overpass query failed for', pref, e); }
-    if(results.length >= 8) break;
+    }catch(e){ console.error('Overpass failed for',pref,e); }
+    if(results.length>=8) break;
   }
-
-  return results.slice(0, 6);
+  return results.slice(0,6);
 }
 
-/* ---------------- BOOT ---------------- */
+/* ---- BOOT ---- */
 (async function boot(){
   if(!firebaseReady){ render(''); return; }
   if(currentCode){
-    const isLeader = localStorage.getItem('p2g_is_leader') === '1';
-    const party = await getParty(currentCode);
-    if(party && party.members && party.members[deviceId]){
-      if(party.status === 'searching' || party.status === 'done'){
-        screenResults();
-      } else {
-        screenLobby(isLeader);
-      }
+    const isLeader=localStorage.getItem('p2g_is_leader')==='1';
+    const party=await getParty(currentCode);
+    if(party&&party.members&&party.members[deviceId]){
+      if(party.status==='searching'||party.status==='done'){ screenResults(); }
+      else { screenLobby(isLeader); }
       return;
     }
   }
