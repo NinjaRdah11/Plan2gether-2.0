@@ -241,26 +241,6 @@ function getDeviceId(){
 }
 const deviceId = getDeviceId();
 
-/* ---- FAVOURITES (per-device, per-party, stored in localStorage) ---- */
-function getFavKey(code){ return `p2g_favs_${code}`; }
-function getFavs(code){
-  try{ return JSON.parse(localStorage.getItem(getFavKey(code)) || '{}'); }
-  catch{ return {}; }
-}
-function setFav(code, spotId, spotData){
-  const favs = getFavs(code);
-  favs[spotId] = spotData;
-  localStorage.setItem(getFavKey(code), JSON.stringify(favs));
-}
-function removeFav(code, spotId){
-  const favs = getFavs(code);
-  delete favs[spotId];
-  localStorage.setItem(getFavKey(code), JSON.stringify(favs));
-}
-function isFav(code, spotId){
-  return !!getFavs(code)[spotId];
-}
-
 /* ---- FIREBASE HELPERS ---- */
 const routeEl = document.getElementById('route');
 function render(html){
@@ -281,41 +261,74 @@ async function setParty(code,data){ try{ await db.ref('parties/'+code).set(data)
 async function updateParty(code,patch){ try{ await db.ref('parties/'+code).update(patch); }catch(e){} }
 async function setMember(code,mid,data){ try{ await db.ref('parties/'+code+'/members/'+mid).set(data); }catch(e){} }
 
-/* likes are stored in Firebase so everyone in the party sees them */
+/* ---- REAL-TIME INTERACTIONS (likes + favs, both in Firebase) ----
+   Structure:
+     parties/{code}/likes/{spotId}/{deviceId}  = true
+     parties/{code}/favs/{spotId}              = {spot object} | null
+
+   One Firebase listener on parties/{code}/interactions watches both
+   sub-paths and calls renderResultsScreen whenever anything changes —
+   so every device in the party sees updates instantly, no reload needed.
+*/
+
+/* Toggle like for current device */
 async function toggleLike(code, spotId){
-  const ref = db.ref(`parties/${code}/likes/${spotId}/${deviceId}`);
+  const ref = db.ref(`parties/${code}/interactions/likes/${spotId}/${deviceId}`);
   const snap = await ref.get();
-  if(snap.exists()){ await ref.remove(); return false; }
-  else { await ref.set(true); return true; }
+  if(snap.exists()) await ref.remove();
+  else await ref.set(true);
 }
-async function getLikes(code){ /* returns {spotId: count} */
-  try{
-    const snap = await db.ref(`parties/${code}/likes`).get();
-    if(!snap.exists()) return {};
-    const raw = snap.val();
-    const out = {};
-    for(const [sid, voters] of Object.entries(raw)){
-      out[sid] = Object.keys(voters||{}).length;
-    }
-    return out;
-  }catch{ return {}; }
+
+/* Toggle favourite — shared across whole party (stored in Firebase) */
+async function toggleFav(code, spotId, spotData){
+  const ref = db.ref(`parties/${code}/interactions/favs/${spotId}`);
+  const snap = await ref.get();
+  if(snap.exists()) await ref.remove();
+  else await ref.set(spotData);
 }
-async function getMyLikes(code){
-  try{
-    const snap = await db.ref(`parties/${code}/likes`).get();
-    if(!snap.exists()) return new Set();
-    const raw = snap.val();
-    const mine = new Set();
-    for(const [sid, voters] of Object.entries(raw)){
-      if(voters && voters[deviceId]) mine.add(sid);
+
+/* Parse raw Firebase interactions snapshot into usable maps */
+function parseInteractions(snap){
+  const raw = snap && snap.val ? snap.val() : null;
+  // likeCounts: {spotId: number}
+  const likeCounts = {};
+  // myLikes: Set<spotId>
+  const myLikes = new Set();
+  // favs: {spotId: spotObject}
+  const favs = {};
+
+  if(raw){
+    if(raw.likes){
+      for(const [sid, voters] of Object.entries(raw.likes)){
+        const voterMap = voters || {};
+        likeCounts[sid] = Object.keys(voterMap).length;
+        if(voterMap[deviceId]) myLikes.add(sid);
+      }
     }
-    return mine;
-  }catch{ return new Set(); }
+    if(raw.favs){
+      for(const [sid, spotObj] of Object.entries(raw.favs)){
+        if(spotObj) favs[sid] = spotObj;
+      }
+    }
+  }
+  return { likeCounts, myLikes, favs };
+}
+
+/* Active real-time listener handle — detached when leaving results screen */
+let interactionsListener = null;
+function stopInteractionsListener(){
+  if(interactionsListener){
+    db.ref(`parties/${currentCode}/interactions`).off('value', interactionsListener);
+    interactionsListener = null;
+  }
 }
 
 let currentCode = localStorage.getItem('p2g_party_code') || null;
 let pollTimer = null;
-function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+function stopPoll(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+  stopInteractionsListener();
+}
 
 /* ---- SCREEN: HOME ---- */
 function screenHome(){
@@ -505,8 +518,13 @@ function renderLobby(isLeader, party){
 /* ---- SCREEN: RESULTS ---- */
 // Holds the current suggestions array so we can re-render without re-fetching
 let lastSuggestions = [];
+// Holds context needed by the live listener callback
+let resultsCtx = null;
 
 async function screenResults(){
+  // Tear down any previous listener first
+  stopInteractionsListener();
+
   render(`<div class="card"><h2>Checking the weather &amp; matching spots…</h2><p class="sub">One moment.</p></div>`);
   const party=await getParty(currentCode);
   if(!party){ screenHome(); return; }
@@ -514,42 +532,51 @@ async function screenResults(){
   const weather=await fetchWeather(party.location);
   const newSpots=await fetchOSMSpots(party.location, members, weather);
 
-  /* merge: keep pinned favourites at top, append fresh results below */
-  const favs=getFavs(currentCode);
-  const favIds=new Set(Object.keys(favs));
-  const freshIds=new Set(newSpots.map(s=>s.id));
-
-  // Spots that are faved but didn't appear in fresh results → keep them
-  const pinnedFavSpots=Object.values(favs).filter(s=>!freshIds.has(s.id));
-  // Fresh spots that happen to be faved too get the fav flag applied below
-  const allSpots=[...pinnedFavSpots, ...newSpots];
-  // dedupe by id
-  const seen=new Set(); lastSuggestions=[];
-  for(const s of allSpots){ if(!seen.has(s.id)){ seen.add(s.id); lastSuggestions.push(s); } }
-
   if(party.status!=='done') await updateParty(currentCode, { status:'done' });
 
-  const likes=await getLikes(currentCode);
-  const myLikes=await getMyLikes(currentCode);
+  // Save context for re-renders triggered by the live listener
+  resultsCtx = { location: party.location, memberCount: members.length, weather };
 
-  renderResultsScreen(party.location, members.length, weather, likes, myLikes);
+  // Seed lastSuggestions from fresh results; favs from Firebase are merged in renderResultsScreen
+  const seen=new Set(); lastSuggestions=[];
+  for(const s of newSpots){ if(!seen.has(s.id)){ seen.add(s.id); lastSuggestions.push(s); } }
+
+  // Attach real-time listener on parties/{code}/interactions
+  // Firebase structure: { likes: {spotId: {deviceId: true}}, favs: {spotId: spotObj} }
+  // We store likes under /likes and favs under /favs as siblings in an "interactions" wrapper
+  // so a single listener covers both and fires on any change.
+  interactionsListener = db.ref(`parties/${currentCode}/interactions`).on('value', snap=>{
+    if(!resultsCtx) return; // screen was left
+    const { likeCounts, myLikes, favs } = parseInteractions(snap);
+
+    // Merge faved spots that aren't in current fresh results into lastSuggestions
+    const freshIds = new Set(lastSuggestions.map(s=>s.id));
+    for(const [sid, spotObj] of Object.entries(favs)){
+      if(!freshIds.has(sid)){ lastSuggestions.push(spotObj); freshIds.add(sid); }
+    }
+
+    renderResultsScreen(likeCounts, myLikes, favs);
+  });
 }
 
-function renderResultsScreen(location, memberCount, weather, likes, myLikes){
-  const favs=getFavs(currentCode);
-  const favSpots=lastSuggestions.filter(s=>favs[s.id]);
-  const nonFavSpots=lastSuggestions.filter(s=>!favs[s.id]);
+function renderResultsScreen(likeCounts, myLikes, favs){
+  if(!resultsCtx) return;
+  const { location, memberCount, weather } = resultsCtx;
 
-  const favsSection=favSpots.length ? `
-    <div class="fav-header">⭐ Saved favourites</div>
-    ${favSpots.map(s=>spotCard(s, likes, myLikes, favs)).join('')}
+  const favSpots    = lastSuggestions.filter(s=>favs[s.id]);
+  const nonFavSpots = lastSuggestions.filter(s=>!favs[s.id]);
+
+  const favsSection = favSpots.length ? `
+    <div class="fav-header">⭐ Saved by the group</div>
+    ${favSpots.map(s=>spotCard(s, likeCounts, myLikes, favs)).join('')}
     <hr style="border:none;border-top:1.5px dashed #e3ddcd;margin:14px 0 12px;">
   ` : '';
 
-  const freshSection=nonFavSpots.length
-    ? nonFavSpots.map(s=>spotCard(s, likes, myLikes, favs)).join('')
-    : favSpots.length ? `<p class="sub" style="color:#7a7e98;font-size:0.88rem;">All results are saved as favourites above.</p>`
-    : `<p class="sub">Couldn't find venues for "${escapeHtml(location)}". Try a bigger or nearby place name.</p>`;
+  const freshSection = nonFavSpots.length
+    ? nonFavSpots.map(s=>spotCard(s, likeCounts, myLikes, favs)).join('')
+    : favSpots.length
+      ? `<p class="sub" style="color:#7a7e98;font-size:0.88rem;">All results are pinned as group favourites above.</p>`
+      : `<p class="sub">Couldn't find venues for "${escapeHtml(location)}". Try a bigger or nearby place name.</p>`;
 
   render(`
     <div class="card">
@@ -561,52 +588,50 @@ function renderResultsScreen(location, memberCount, weather, likes, myLikes){
       </div>
       ${favsSection}
       ${freshSection}
-      ${lastSuggestions.length?`<p class="hint" style="margin-top:6px;">Spots sourced from OpenStreetMap contributors.</p>`:''}
+      ${lastSuggestions.length?`<p class="hint" style="margin-top:6px;">Spots sourced from OpenStreetMap contributors. Likes &amp; favourites are shared with your whole party in real-time.</p>`:''}
     </div>
     <button class="btn btn-secondary" id="reSearch">Search again</button>
     <button class="small-link" id="newParty">Start a new party</button>`);
 
-  /* wire up like / fav buttons — no page reload, just re-render */
+  // Wire up action buttons — writes go to Firebase, listener re-renders for everyone
   document.querySelectorAll('.action-btn[data-action]').forEach(btn=>{
     btn.addEventListener('click', async e=>{
       e.stopPropagation();
-      const action=btn.dataset.action;
-      const sid=btn.dataset.sid;
-      const spot=lastSuggestions.find(s=>s.id===sid);
+      const action = btn.dataset.action;
+      const sid    = btn.dataset.sid;
+      const spot   = lastSuggestions.find(s=>s.id===sid);
       if(!spot) return;
-
+      // Optimistic visual feedback — disable briefly to avoid double-tap
+      btn.disabled = true;
       if(action==='like'){
         await toggleLike(currentCode, sid);
-        const newLikes=await getLikes(currentCode);
-        const newMyLikes=await getMyLikes(currentCode);
-        renderResultsScreen(location, memberCount, weather, newLikes, newMyLikes);
       } else if(action==='fav'){
-        if(isFav(currentCode, sid)){ removeFav(currentCode, sid); }
-        else { setFav(currentCode, sid, spot); }
-        const newLikes=await getLikes(currentCode);
-        const newMyLikes=await getMyLikes(currentCode);
-        renderResultsScreen(location, memberCount, weather, newLikes, newMyLikes);
+        await toggleFav(currentCode, sid, spot);
       }
+      btn.disabled = false;
+      // No manual re-render needed — the Firebase listener fires and does it
     });
   });
 
-  /* OSM open links */
+  // Prevent OSM link clicks from bubbling to the card
   document.querySelectorAll('.osm-link').forEach(a=>{
     a.addEventListener('click', e=>e.stopPropagation());
   });
 
   document.getElementById('reSearch').onclick=()=> screenResults();
   document.getElementById('newParty').onclick=()=>{
+    stopInteractionsListener();
+    resultsCtx = null;
     localStorage.removeItem('p2g_party_code');
     localStorage.removeItem('p2g_is_leader');
     currentCode=null; screenHome();
   };
 }
 
-function spotCard(s, likes, myLikes, favs){
-  const likeCount=(likes&&likes[s.id])||0;
+function spotCard(s, likeCounts, myLikes, favs){
+  const likeCount=(likeCounts&&likeCounts[s.id])||0;
   const iLiked=myLikes&&myLikes.has(s.id);
-  const faved=favs&&favs[s.id];
+  const faved=favs&&!!favs[s.id];
   const desc=buildDescription(s);
   return `
     <div class="spot${faved?' is-fav':''}" data-id="${escapeHtml(s.id)}">
